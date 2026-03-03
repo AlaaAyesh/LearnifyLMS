@@ -562,7 +562,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
                           width: Responsive.width(context, 160),
                           height: Responsive.height(context, 44),
                           child: ElevatedButton(
-                            onPressed: () {},
+                            onPressed: _handleSubscribe,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.white,
                               elevation: 0,

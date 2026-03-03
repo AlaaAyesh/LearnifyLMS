@@ -1,5 +1,5 @@
 class ApiConstants {
-  static const String baseUrl = 'https://api.learnify-stage.xyz/api/';
+  static const String baseUrl = 'https://api.learnifynow.com/api/';
 
   static const String login = 'auth/login';
   static const String register = 'auth/register';
