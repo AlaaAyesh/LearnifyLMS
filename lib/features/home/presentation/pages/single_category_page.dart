@@ -31,11 +31,15 @@ class SingleCategoryPage extends StatefulWidget {
 
 class _SingleCategoryPageState extends State<SingleCategoryPage> {
   late final CoursesBloc _coursesBloc;
+  final ScrollController _scrollController = ScrollController();
+  int _visibleItemCount = 20;
+  static const int _pageSize = 20;
 
   @override
   void initState() {
     super.initState();
     _coursesBloc = sl<CoursesBloc>();
+    _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _coursesBloc.add(
         LoadCoursesEvent(
@@ -49,8 +53,24 @@ class _SingleCategoryPageState extends State<SingleCategoryPage> {
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     _coursesBloc.close();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    if (maxScroll <= 0) return;
+
+    // Trigger when user scrolls past ~80% of the current extent
+    if (currentScroll >= maxScroll * 0.8) {
+      setState(() {
+        _visibleItemCount += _pageSize;
+      });
+    }
   }
 
   @override
@@ -156,7 +176,9 @@ class _SingleCategoryPageState extends State<SingleCategoryPage> {
   Widget _buildCoursesGrid(BuildContext context, List<Course> courses) {
     // نعرض الدورات بترتيب عكسي (آخر دورة أولاً)
     final reversedCourses = courses.reversed.toList();
+    final itemCount = _visibleItemCount.clamp(0, reversedCourses.length);
     return GridView.builder(
+      controller: _scrollController,
       padding: const EdgeInsets.all(24),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
@@ -164,7 +186,7 @@ class _SingleCategoryPageState extends State<SingleCategoryPage> {
         crossAxisSpacing: 20,
         mainAxisSpacing: 24,
       ),
-      itemCount: reversedCourses.length,
+      itemCount: itemCount,
       itemBuilder: (context, index) {
         final course = reversedCourses[index];
         return _CourseGridItem(

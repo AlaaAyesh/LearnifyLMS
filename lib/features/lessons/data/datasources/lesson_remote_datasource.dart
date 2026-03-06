@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/network/dio_client.dart';
@@ -47,13 +48,17 @@ class LessonRemoteDataSourceImpl implements LessonRemoteDataSource {
   @override
   Future<void> markLessonAsViewed(int id) async {
     try {
-      print('LessonRemoteDataSource: Marking lesson $id as viewed');
+      if (kDebugMode) {
+        debugPrint('LessonRemoteDataSource: Marking lesson $id as viewed');
+      }
       final response = await dioClient.post(
         '${ApiConstants.lessons}/$id/view',
       );
 
-      print('LessonRemoteDataSource: Response status: ${response.statusCode}');
-      print('LessonRemoteDataSource: Response data: ${response.data}');
+      if (kDebugMode) {
+        debugPrint('LessonRemoteDataSource: Response status: ${response.statusCode}');
+        debugPrint('LessonRemoteDataSource: Response data: ${response.data}');
+      }
 
       if (response.statusCode != 200 && response.statusCode != 201) {
         throw ServerException(
@@ -61,13 +66,19 @@ class LessonRemoteDataSourceImpl implements LessonRemoteDataSource {
           statusCode: response.statusCode,
         );
       }
-      print('LessonRemoteDataSource: Successfully marked lesson $id as viewed');
+      if (kDebugMode) {
+        debugPrint('LessonRemoteDataSource: Successfully marked lesson $id as viewed');
+      }
     } on DioException catch (e) {
-      print('LessonRemoteDataSource: Error marking lesson $id as viewed: ${e.message}');
-      print('LessonRemoteDataSource: Error response: ${e.response?.data}');
+      if (kDebugMode) {
+        debugPrint('LessonRemoteDataSource: Error marking lesson $id as viewed: ${e.message}');
+        debugPrint('LessonRemoteDataSource: Error response: ${e.response?.data}');
+      }
       throw _handleDioError(e, 'فشل في تحديث حالة المشاهدة');
     } catch (e) {
-      print('LessonRemoteDataSource: Unexpected error: $e');
+      if (kDebugMode) {
+        debugPrint('LessonRemoteDataSource: Unexpected error: $e');
+      }
       rethrow;
     }
   }

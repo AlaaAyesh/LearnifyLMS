@@ -11,6 +11,12 @@ ReelsFeedResponseModel parseReelsFeedInIsolate(Map<String, dynamic> json) {
   return ReelsFeedResponseModel.fromJson(json);
 }
 
+List<ReelCategoryModel> parseReelCategoriesInIsolate(List<dynamic> jsonList) {
+  return jsonList
+      .map((json) => ReelCategoryModel.fromJson(json as Map<String, dynamic>))
+      .toList();
+}
+
 abstract class ReelsRemoteDataSource {
   Future<ReelsFeedResponseModel> getReelsFeed({
     int perPage = 10,
@@ -279,16 +285,12 @@ class ReelsRemoteDataSourceImpl implements ReelsRemoteDataSource {
           final categoriesList = data['data'] ?? data;
           
           if (categoriesList is List) {
-            return categoriesList
-                .map((json) => ReelCategoryModel.fromJson(json as Map<String, dynamic>))
-                .toList();
+            return compute(parseReelCategoriesInIsolate, List<dynamic>.from(categoriesList));
           }
         }
 
         if (responseData['data'] is List) {
-          return (responseData['data'] as List)
-              .map((json) => ReelCategoryModel.fromJson(json as Map<String, dynamic>))
-              .toList();
+          return compute(parseReelCategoriesInIsolate, List<dynamic>.from(responseData['data'] as List));
         }
 
         return [];
@@ -337,11 +339,17 @@ class ReelsRemoteDataSourceImpl implements ReelsRemoteDataSource {
         final responseData = response.data;
 
         if (responseData['status'] == 'success' && responseData['data'] != null) {
-          return ReelsFeedResponseModel.fromJson(responseData['data']);
+          return compute(
+            parseReelsFeedInIsolate,
+            responseData['data'] as Map<String, dynamic>,
+          );
         }
 
         if (responseData['data'] != null || responseData['items'] != null) {
-          return ReelsFeedResponseModel.fromJson(responseData);
+          return compute(
+            parseReelsFeedInIsolate,
+            responseData as Map<String, dynamic>,
+          );
         }
 
         return const ReelsFeedResponseModel(
@@ -393,11 +401,17 @@ class ReelsRemoteDataSourceImpl implements ReelsRemoteDataSource {
         final responseData = response.data;
 
         if (responseData['status'] == 'success' && responseData['data'] != null) {
-          return ReelsFeedResponseModel.fromJson(responseData['data']);
+          return compute(
+            parseReelsFeedInIsolate,
+            responseData['data'] as Map<String, dynamic>,
+          );
         }
 
         if (responseData['data'] != null || responseData['items'] != null) {
-          return ReelsFeedResponseModel.fromJson(responseData);
+          return compute(
+            parseReelsFeedInIsolate,
+            responseData as Map<String, dynamic>,
+          );
         }
 
         return const ReelsFeedResponseModel(

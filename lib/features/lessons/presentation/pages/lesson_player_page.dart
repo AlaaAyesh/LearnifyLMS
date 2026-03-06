@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -124,8 +125,11 @@ class _LessonPlayerPageContentState extends State<_LessonPlayerPageContent> {
     _progressTimer?.cancel();
 
     if (widget.lessonId > 0 && !_hasMarkedAsViewed) {
-      print(
-          'LessonPlayerPage: Marking lesson ${widget.lessonId} as viewed on dispose (fallback)');
+      if (kDebugMode) {
+        debugPrint(
+          'LessonPlayerPage: Marking lesson ${widget.lessonId} as viewed on dispose (fallback)',
+        );
+      }
       if (mounted) {
         context
             .read<LessonBloc>()
@@ -162,27 +166,39 @@ class _LessonPlayerPageContentState extends State<_LessonPlayerPageContent> {
 
   void _startProgressTracking(Lesson lesson) {
     if (widget.lessonId <= 0) {
-      print(
-          'LessonPlayerPage: Skipping progress tracking for invalid lesson ID: ${widget.lessonId}');
+      if (kDebugMode) {
+        debugPrint(
+          'LessonPlayerPage: Skipping progress tracking for invalid lesson ID: ${widget.lessonId}',
+        );
+      }
       return;
     }
 
     if (_progressTimer != null && _progressTimer!.isActive) {
-      print(
-          'LessonPlayerPage: Progress tracking already started for lesson ${widget.lessonId}');
+      if (kDebugMode) {
+        debugPrint(
+          'LessonPlayerPage: Progress tracking already started for lesson ${widget.lessonId}',
+        );
+      }
       return;
     }
 
     _videoDurationSeconds =
         _parseDurationToSeconds(lesson.videoDuration ?? lesson.duration);
     if (_videoDurationSeconds == null || _videoDurationSeconds! <= 0) {
-      print(
-          'LessonPlayerPage: Cannot start progress tracking - invalid duration for lesson ${widget.lessonId}');
+      if (kDebugMode) {
+        debugPrint(
+          'LessonPlayerPage: Cannot start progress tracking - invalid duration for lesson ${widget.lessonId}',
+        );
+      }
       return;
     }
 
-    print(
-        'LessonPlayerPage: Starting progress tracking for lesson ${widget.lessonId} (duration: $_videoDurationSeconds seconds)');
+    if (kDebugMode) {
+      debugPrint(
+        'LessonPlayerPage: Starting progress tracking for lesson ${widget.lessonId} (duration: $_videoDurationSeconds seconds)',
+      );
+    }
 
     _videoStartTime = DateTime.now();
     _currentProgress = 0.0;
@@ -198,18 +214,20 @@ class _LessonPlayerPageContentState extends State<_LessonPlayerPageContent> {
       final elapsed = DateTime.now().difference(_videoStartTime!).inSeconds;
       final newProgress = (elapsed / _videoDurationSeconds!).clamp(0.0, 1.0);
 
-      if (mounted) {
-        setState(() {
-          _currentProgress = newProgress;
-        });
-
-        if (widget.onProgressUpdate != null) {
-          widget.onProgressUpdate!(newProgress);
-          print(
-              'LessonPlayerPage: Progress update - lesson ${widget.lessonId}, progress: ${(newProgress * 100).toStringAsFixed(1)}%');
-        }
-      } else {
+      if (!mounted) {
         timer.cancel();
+        return;
+      }
+
+      _currentProgress = newProgress;
+
+      if (widget.onProgressUpdate != null) {
+        widget.onProgressUpdate!(newProgress);
+        if (kDebugMode) {
+          debugPrint(
+            'LessonPlayerPage: Progress update - lesson ${widget.lessonId}, progress: ${(newProgress * 100).toStringAsFixed(1)}%',
+          );
+        }
       }
     });
   }
@@ -217,8 +235,11 @@ class _LessonPlayerPageContentState extends State<_LessonPlayerPageContent> {
   void _onVideoLoaded() {
     if (widget.lessonId > 0 && !_hasMarkedAsViewed) {
       _hasMarkedAsViewed = true;
-      print(
-          'LessonPlayerPage: Marking lesson ${widget.lessonId} as viewed (video loaded)');
+      if (kDebugMode) {
+        debugPrint(
+          'LessonPlayerPage: Marking lesson ${widget.lessonId} as viewed (video loaded)',
+        );
+      }
       if (mounted) {
         context
             .read<LessonBloc>()

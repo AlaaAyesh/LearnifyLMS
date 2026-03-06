@@ -1,3 +1,5 @@
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -12,7 +14,6 @@ import '../../../authentication/domain/entities/user.dart';
 import '../../../authentication/presentation/bloc/auth_bloc.dart';
 import '../../../authentication/presentation/bloc/auth_event.dart';
 import '../../../authentication/presentation/bloc/auth_state.dart';
-import '../../../authentication/presentation/widgets/EmailField.dart';
 import '../../../authentication/presentation/widgets/PasswordField.dart';
 import '../../../authentication/presentation/widgets/name_field.dart';
 import '../../../authentication/presentation/widgets/phone_field.dart';
@@ -111,7 +112,7 @@ class _UnauthenticatedProfilePage extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(32),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
+                  color: AppColors.primary.withAlpha(26),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -144,7 +145,7 @@ class _UnauthenticatedProfilePage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(22),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withOpacity(0.2),
+                        color: AppColors.primary.withAlpha(51),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -186,7 +187,7 @@ class _UnauthenticatedProfilePage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(22),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withOpacity(0.15),
+                        color: AppColors.primary.withAlpha(38),
                         blurRadius: 8,
                         offset: const Offset(0, 3),
                       ),
@@ -295,7 +296,9 @@ class _AuthenticatedProfilePageState extends State<_AuthenticatedProfilePage> {
         };
       }
     } catch (e) {
-      print('Error parsing birthday: $e');
+      if (kDebugMode) {
+        debugPrint('ProfilePage: Error parsing birthday: $e');
+      }
     }
     return {'day': '', 'month': '', 'year': ''};
   }
@@ -551,9 +554,9 @@ class _AuthenticatedProfilePageState extends State<_AuthenticatedProfilePage> {
   Widget _buildProfileAvatar(User user) {
     return CircleAvatar(
       radius: 50,
-      backgroundColor: AppColors.primary.withOpacity(0.1),
+      backgroundColor: AppColors.primary.withAlpha(26),
       backgroundImage: user.avatarUrl != null && user.avatarUrl!.isNotEmpty
-          ? NetworkImage(user.avatarUrl!)
+          ? CachedNetworkImageProvider(user.avatarUrl!)
           : null,
       child: user.avatarUrl == null || user.avatarUrl!.isEmpty
           ? Text(
@@ -573,8 +576,8 @@ class _AuthenticatedProfilePageState extends State<_AuthenticatedProfilePage> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: user.isSubscribed
-            ? AppColors.success.withOpacity(0.1)
-            : AppColors.warning.withOpacity(0.1),
+            ? AppColors.success.withAlpha(26)
+            : AppColors.warning.withAlpha(26),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(

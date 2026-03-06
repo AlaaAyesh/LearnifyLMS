@@ -1,9 +1,13 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/network/dio_client.dart';
-import '../../../../core/network/cache_service.dart';
 import '../../../home/data/models/course_model.dart';
+
+List<CourseModel> parseCoursesListInIsolate(List<dynamic> jsonList) {
+  return jsonList.map((json) => CourseModel.fromJson(json)).toList();
+}
 
 abstract class CourseRemoteDataSource {
   Future<List<CourseModel>> getCourses({
@@ -69,9 +73,8 @@ class CourseRemoteDataSourceImpl implements CourseRemoteDataSource {
           coursesJson = [];
         }
 
-        return coursesJson
-            .map((json) => CourseModel.fromJson(json))
-            .toList();
+        if (coursesJson.isEmpty) return <CourseModel>[];
+        return compute(parseCoursesListInIsolate, coursesJson);
       }
 
       throw ServerException(
@@ -135,9 +138,8 @@ class CourseRemoteDataSourceImpl implements CourseRemoteDataSource {
           coursesJson = [];
         }
 
-        return coursesJson
-            .map((json) => CourseModel.fromJson(json))
-            .toList();
+        if (coursesJson.isEmpty) return <CourseModel>[];
+        return compute(parseCoursesListInIsolate, coursesJson);
       }
 
       throw ServerException(

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:learnify_lms/core/theme/app_text_styles.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/responsive.dart';
@@ -9,13 +8,48 @@ import '../../domain/entities/course.dart';
 import 'course_details_page.dart';
 import 'main_navigation_page.dart';
 
-class PopularCoursesPage extends StatelessWidget {
+class PopularCoursesPage extends StatefulWidget {
   final List<Course> initialCourses;
 
   const PopularCoursesPage({
     super.key,
     required this.initialCourses,
   });
+
+  @override
+  State<PopularCoursesPage> createState() => _PopularCoursesPageState();
+}
+
+class _PopularCoursesPageState extends State<PopularCoursesPage> {
+  final ScrollController _scrollController = ScrollController();
+  int _visibleItemCount = 20;
+  static const int _pageSize = 20;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    if (maxScroll <= 0) return;
+
+    if (currentScroll >= maxScroll * 0.8) {
+      setState(() {
+        _visibleItemCount += _pageSize;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,11 +66,15 @@ class PopularCoursesPage extends StatelessWidget {
   }
 
   Widget _buildCoursesGrid(BuildContext context) {
-    if (initialCourses.isEmpty) {
+    if (widget.initialCourses.isEmpty) {
       return _buildEmptyState();
     }
 
+    final itemCount =
+        _visibleItemCount.clamp(0, widget.initialCourses.length);
+
     return GridView.builder(
+      controller: _scrollController,
       padding: const EdgeInsets.all(24),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
@@ -44,9 +82,9 @@ class PopularCoursesPage extends StatelessWidget {
         crossAxisSpacing: 20,
         mainAxisSpacing: 24,
       ),
-      itemCount: initialCourses.length,
+      itemCount: itemCount,
       itemBuilder: (context, index) {
-        final course = initialCourses[index];
+        final course = widget.initialCourses[index];
         return _CourseGridItem(
           course: course,
           onTap: course.soon ? null : () => _onCourseTap(context, course),

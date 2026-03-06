@@ -56,7 +56,6 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
   int _playbackIndex = 0;
   Timer? _pageChangeDebounce;
   int _selectedCategoryIndex = -1;
-  bool _showPaywall = false;
   bool _isSubscribed = false;
   bool _isPageVisible =
       true;
@@ -277,6 +276,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
 
     final authLocalDataSource = sl<AuthLocalDataSource>();
     final token = await authLocalDataSource.getAccessToken();
+    if (!mounted) return;
 
     final isAuthenticated = token != null && token.isNotEmpty;
     final mainNav = context.mainNavigation;
@@ -290,6 +290,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
             'returnTo': 'subscriptions',
           },
         );
+        if (!mounted) return;
 
         if (result == true && mounted) {
           debugPrint('ReelsFeedPage: Login successful, switching to subscriptions tab');
@@ -625,7 +626,10 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
                     }
                   });
                 }
-                return _buildReelsFeed(context, state);
+                return BlocSelector<ReelsBloc, ReelsState, ReelsLoaded>(
+                  selector: (s) => s is ReelsLoaded ? s : state,
+                  builder: (context, loadedState) => _buildReelsFeed(context, loadedState),
+                );
               }
 
               if (state is ReelsWithCategories) {
@@ -641,28 +645,12 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
           ),
 
           if (!(_currentIndex == 0 && !_isSubscribed))
-            Positioned(
-              top: topPadding + Responsive.height(context, 12),
-              left: 0,
-              right: 0,
-              child: Row(
-                children: [
-                  if (widget.showBackButton)
-                    Padding(
-                      padding: Responsive.padding(context, left: 16),
-                      child: GestureDetector(
-                        onTap: () => Navigator.of(context).pop(),
-                        child: Icon(
-                          Icons.arrow_back_ios_new,
-                          color: Colors.white,
-                          size: Responsive.iconSize(context, 24),
-                        ),
-                      ),
-                    ),
-                  if (!widget.hideCategoryFilters && widget.initialReel == null)
-                    Expanded(child: _buildCategoryFilters(context)),
-                ],
-              ),
+            _ReelsHeaderOverlay(
+              topPadding: topPadding,
+              showBackButton: widget.showBackButton,
+              hideCategoryFilters: widget.hideCategoryFilters,
+              initialReel: widget.initialReel,
+              categoryFilters: _buildCategoryFilters(context),
             ),
         ],
       ),
@@ -973,7 +961,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
             if (widget.hideCategoryFilters || widget.initialReel != null) {
               Navigator.of(context).pop();
             } else {
-              _navigateToUserProfile(context, reel.owner);
+              _navigateToUserProfile(reel.owner);
             }
           },
         );
@@ -1045,7 +1033,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
     }
   }
 
-  void _navigateToUserProfile(BuildContext context, ReelOwner owner) async {
+  Future<void> _navigateToUserProfile(ReelOwner owner) async {
     setState(() => _isPageVisible = false);
 
     await Future.delayed(const Duration(milliseconds: 100));
@@ -1067,6 +1055,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
         MaterialPageRoute(builder: (_) => profilePage),
       );
     }
+    if (!mounted) return;
 
     if (mounted) {
       setState(() {
@@ -1076,6 +1065,49 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
         }
       });
     }
+  }
+}
+
+class _ReelsHeaderOverlay extends StatelessWidget {
+  final double topPadding;
+  final bool showBackButton;
+  final bool hideCategoryFilters;
+  final Reel? initialReel;
+  final Widget categoryFilters;
+
+  const _ReelsHeaderOverlay({
+    required this.topPadding,
+    required this.showBackButton,
+    required this.hideCategoryFilters,
+    required this.initialReel,
+    required this.categoryFilters,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: topPadding + Responsive.height(context, 12),
+      left: 0,
+      right: 0,
+      child: Row(
+        children: [
+          if (showBackButton)
+            Padding(
+              padding: Responsive.padding(context, left: 16),
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: Icon(
+                  Icons.arrow_back_ios_new,
+                  color: Colors.white,
+                  size: Responsive.iconSize(context, 24),
+                ),
+              ),
+            ),
+          if (!hideCategoryFilters && initialReel == null)
+            Expanded(child: categoryFilters),
+        ],
+      ),
+    );
   }
 }
 
@@ -1131,7 +1163,7 @@ class _UnauthenticatedReelsPage extends StatelessWidget {
                           borderRadius: BorderRadius.circular(22),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.primary.withOpacity(0.2),
+                              color: AppColors.primary.withAlpha(51),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -1147,7 +1179,8 @@ class _UnauthenticatedReelsPage extends StatelessWidget {
                               arguments: {'returnTo': 'reels'},
                             );
 
-                            if (result == true && context.mounted) {
+                            if (!context.mounted) return;
+                            if (result == true) {
                               Navigator.of(context, rootNavigator: true)
                                   .pushReplacementNamed(AppRouter.reelsFeed);
                             }
@@ -1180,7 +1213,7 @@ class _UnauthenticatedReelsPage extends StatelessWidget {
                           borderRadius: BorderRadius.circular(22),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.primary.withOpacity(0.15),
+                              color: AppColors.primary.withAlpha(38),
                               blurRadius: 8,
                               offset: const Offset(0, 3),
                             ),
@@ -1196,7 +1229,8 @@ class _UnauthenticatedReelsPage extends StatelessWidget {
                               arguments: {'returnTo': 'reels'},
                             );
 
-                            if (result == true && context.mounted) {
+                            if (!context.mounted) return;
+                            if (result == true) {
                               Navigator.of(context, rootNavigator: true)
                                   .pushReplacementNamed(AppRouter.reelsFeed);
                             }
