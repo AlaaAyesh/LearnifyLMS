@@ -8,6 +8,7 @@ import 'core/theme/app_theme.dart';
 import 'features/authentication/presentation/bloc/auth_bloc.dart';
 import 'features/authentication/presentation/bloc/auth_event.dart';
 import 'features/authentication/presentation/bloc/auth_state.dart';
+import 'core/widgets/premium_subscription_popup.dart';
 
 class LearnifyApp extends StatelessWidget {
   const LearnifyApp({super.key});
@@ -36,15 +37,54 @@ class LearnifyApp extends StatelessWidget {
         onGenerateRoute: AppRouter.generateRoute,
         builder: (context, child) {
           return BlocListener<AuthBloc, AuthState>(
-            listenWhen: (previous, current) => current is AuthUnauthenticated,
             listener: (context, state) {
-              if (state is! AuthUnauthenticated) return;
-              final currentRoute = ModalRoute.of(context)?.settings.name;
-              if (currentRoute == AppRouter.splash || currentRoute == AppRouter.login) return;
-              Navigator.of(context).pushNamedAndRemoveUntil(
-                AppRouter.splash,
-                (route) => false,
-              );
+              if (state is AuthLoggedInFromAnotherDevice) {
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (ctx) {
+                    return Center(
+                      child: PremiumOvalPopup(
+                        showCloseButton: false,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              state.message,
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.of(ctx).pop();
+                                context.read<AuthBloc>().add(LogoutEvent());
+                              },
+                              child: const Text('حسناً'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              } else if (state is AuthSessionExpired) {
+                context.read<AuthBloc>().add(LogoutEvent());
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(state.message),
+                  ),
+                );
+              } else if (state is AuthUnauthenticated) {
+                final currentRoute = ModalRoute.of(context)?.settings.name;
+                if (currentRoute == AppRouter.splash || currentRoute == AppRouter.login) return;
+                Navigator.of(context).pushNamedAndRemoveUntil(
+                  AppRouter.splash,
+                  (route) => false,
+                );
+              }
+
+              return;
             },
             child: MediaQuery(
               data: MediaQuery.of(context).copyWith(

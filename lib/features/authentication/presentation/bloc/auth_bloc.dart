@@ -534,8 +534,18 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     result.fold(
       (failure) {
         if (failure is AuthenticationFailure) {
-          add(LogoutEvent());
-          emit(AuthError('انتهت صلاحية الجلسة. تم تسجيل الخروج تلقائياً'));
+          final message = failure.message;
+
+          if (message.contains('جهاز آخر') ||
+              message.contains('another device')) {
+            emit(AuthLoggedInFromAnotherDevice(message));
+          } else if (message.contains('انتهت صلاحية') ||
+              message.contains('expired') ||
+              message.contains('unauthenticated')) {
+            emit(AuthSessionExpired(message));
+          } else {
+            emit(AuthError(message));
+          }
         } else {
           emit(AuthError(failure.message));
         }

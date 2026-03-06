@@ -95,4 +95,22 @@ class ProfileUpdated extends AuthState {
   List<Object?> get props => [user];
 }
 
+class AuthSessionExpired extends AuthState {
+  final String message;
+
+  const AuthSessionExpired(this.message);
+
+  @override
+  List<Object?> get props => [message];
+}
+
+class AuthLoggedInFromAnotherDevice extends AuthState {
+  final String message;
+
+  const AuthLoggedInFromAnotherDevice(this.message);
+
+  @override
+  List<Object?> get props => [message];
+}
+
 
