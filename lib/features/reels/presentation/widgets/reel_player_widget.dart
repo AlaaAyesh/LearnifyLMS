@@ -78,6 +78,7 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
   late final ValueNotifier<int> _progressSecondsNotifier;
   Timer? _progressTimer;
   int? _playerDurationSeconds;
+  int? _dragSeekTarget;
 
   void _onBetterPlayerEvent(BetterPlayerEvent event) {
     if (event.betterPlayerEventType != BetterPlayerEventType.progress) return;
@@ -488,8 +489,24 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
     final progress = (1.0 - (tapPosition / totalWidth)).clamp(0.0, 1.0);
     final targetSeconds = (progress * _durationSeconds).round().clamp(0, _durationSeconds);
     
+    _seekToSeconds(targetSeconds);
+  }
+
+  void _onProgressBarDragUpdate(double dragPosition, double totalWidth) {
+    if (_durationSeconds <= 0) return;
+    if (totalWidth <= 0) return;
+
+    final progress = (1.0 - (dragPosition / totalWidth)).clamp(0.0, 1.0);
+    final targetSeconds =
+        (progress * _durationSeconds).round().clamp(0, _durationSeconds);
+
     _progressSecondsNotifier.value = targetSeconds;
-    
+    _dragSeekTarget = targetSeconds;
+  }
+
+  void _seekToSeconds(int targetSeconds) {
+    _progressSecondsNotifier.value = targetSeconds;
+
     if (_controller != null) {
       _seekAndResume(targetSeconds);
     } else if (_webController != null) {
@@ -709,6 +726,33 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
                                 final localPos = box.globalToLocal(details.globalPosition);
                                 final tapX = localPos.dx.clamp(0.0, barWidth);
                                 _onProgressBarTap(tapX, barWidth);
+                              }
+                            },
+                            onHorizontalDragStart: (details) {
+                              final RenderBox? box =
+                                  context.findRenderObject() as RenderBox?;
+                              if (box != null && box.hasSize) {
+                                final localPos =
+                                    box.globalToLocal(details.globalPosition);
+                                final dragX = localPos.dx.clamp(0.0, barWidth);
+                                _onProgressBarDragUpdate(dragX, barWidth);
+                              }
+                            },
+                            onHorizontalDragUpdate: (details) {
+                              final RenderBox? box =
+                                  context.findRenderObject() as RenderBox?;
+                              if (box != null && box.hasSize) {
+                                final localPos =
+                                    box.globalToLocal(details.globalPosition);
+                                final dragX = localPos.dx.clamp(0.0, barWidth);
+                                _onProgressBarDragUpdate(dragX, barWidth);
+                              }
+                            },
+                            onHorizontalDragEnd: (_) {
+                              final target = _dragSeekTarget;
+                              if (target != null) {
+                                _seekToSeconds(target);
+                                _dragSeekTarget = null;
                               }
                             },
                             behavior: HitTestBehavior.opaque,
