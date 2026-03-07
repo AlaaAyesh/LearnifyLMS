@@ -835,7 +835,9 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
           _currentIndex = index;
 
           // في وضع الكل (بدون اختيار كاتيجوري) ما نغيّرش التاب تلقائيًا
+          // وكذلك لا نعدل التاب لأول صفحة بعد ما اليوزر يختار الكاتيجوري لأول مرة (index == 0)
           if (_selectedCategoryIndex >= 0 &&
+              index > 0 &&
               !widget.hideCategoryFilters &&
               widget.initialReel == null &&
               _categories.isNotEmpty &&
