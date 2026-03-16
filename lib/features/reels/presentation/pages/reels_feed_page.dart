@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:better_player_plus/better_player_plus.dart';
 import 'package:learnify_lms/core/theme/app_text_styles.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/di/injection_container.dart';
@@ -74,6 +75,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WakelockPlus.enable();
     _currentIndex = widget.initialReel != null ? 0 : widget.initialIndex;
     _playbackIndex = _currentIndex;
     _pageController = PageController(
@@ -99,10 +101,12 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.hidden) {
+      WakelockPlus.disable();
       if (_isPageVisible) {
         setState(() => _isPageVisible = false);
       }
     } else if (state == AppLifecycleState.resumed) {
+      WakelockPlus.enable();
       if (widget.isTabActive && !_isPageVisible) {
         setState(() {
           _isPageVisible = true;
@@ -218,12 +222,14 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
   @override
   void didPushNext() {
     setState(() => _isPageVisible = false);
+    WakelockPlus.disable();
     if (isReelNativePlayerSupported) reelControllerPool.pauseAll();
   }
 
   @override
   void didPop() {
     setState(() => _isPageVisible = false);
+    WakelockPlus.disable();
     if (isReelNativePlayerSupported) reelControllerPool.pauseAll();
   }
 
@@ -331,6 +337,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
     WidgetsBinding.instance.removeObserver(this);
     routeObserver.unsubscribe(this);
     _pageController.dispose();
+    WakelockPlus.disable();
     if (isReelNativePlayerSupported) reelControllerPool.disposeAll();
     _setLightStatusBar();
     super.dispose();

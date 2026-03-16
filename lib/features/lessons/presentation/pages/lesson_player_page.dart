@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../res/assets_res.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -98,9 +99,12 @@ class _LessonPlayerPageContentState extends State<_LessonPlayerPageContent> {
   void initState() {
     super.initState();
     _checkAuthentication();
+    WakelockPlus.enable();
 
+    // السماح بالدوران في شاشة مشغّل الدروس فقط
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
@@ -123,6 +127,7 @@ class _LessonPlayerPageContentState extends State<_LessonPlayerPageContent> {
   @override
   void dispose() {
     _progressTimer?.cancel();
+    WakelockPlus.disable();
 
     if (widget.lessonId > 0 && !_hasMarkedAsViewed) {
       if (kDebugMode) {
@@ -140,6 +145,7 @@ class _LessonPlayerPageContentState extends State<_LessonPlayerPageContent> {
       }
     }
 
+    // استعادة قفل الشاشة عمودياً عند الخروج من مشغّل الدروس
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     super.dispose();
   }
@@ -412,6 +418,48 @@ class _LessonPlayerPageContentState extends State<_LessonPlayerPageContent> {
       });
     }
 
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+
+    // في الوضع الأفقي: الفيديو فول سكرين فقط لتجنب الـ overflow وتحسين المشاهدة
+    if (isLandscape) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned.fill(
+              child: BunnyVideoPlayer(
+                videoUrl: videoUrl,
+                onVideoLoaded: () {
+                  _onVideoLoaded();
+                  if (widget.lessonId > 0) {
+                    _startProgressTracking(lesson);
+                  }
+                },
+              ),
+            ),
+            SafeArea(
+              child: Align(
+                alignment: AlignmentDirectional.topStart,
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: IconButton(
+                    onPressed: () => _onBackPressed(lesson),
+                    icon: const Icon(Icons.arrow_back_ios_new),
+                    color: Colors.white,
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.black54,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // الوضع العمودي: التخطيط المعتاد (فيديو + قائمة الدروس)
     final String appBarTitle = widget.course?.nameAr ?? lesson.nameAr;
 
     return Scaffold(

@@ -14,9 +14,6 @@ void main() async {
     HiveService.init(),
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
     ]),
     _setSystemUI(),
   ]);
