@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:better_player_plus/better_player_plus.dart';
 
@@ -69,6 +70,18 @@ class _BunnyVideoPlayerState extends State<BunnyVideoPlayer> {
         autoPlay: true,
         looping: false,
         fit: BoxFit.contain,
+        deviceOrientationsOnFullScreen: const [
+          DeviceOrientation.portraitUp,
+          DeviceOrientation.portraitDown,
+          DeviceOrientation.landscapeLeft,
+          DeviceOrientation.landscapeRight,
+        ],
+        deviceOrientationsAfterFullScreen: const [
+          DeviceOrientation.portraitUp,
+          DeviceOrientation.portraitDown,
+          DeviceOrientation.landscapeLeft,
+          DeviceOrientation.landscapeRight,
+        ],
         controlsConfiguration: const BetterPlayerControlsConfiguration(
           showControls: true,
           enableFullscreen: true,

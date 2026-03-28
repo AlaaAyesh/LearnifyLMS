@@ -8,6 +8,10 @@ class Subscription extends Equatable {
   final String usdPrice;
   final String priceBeforeDiscount;
   final String usdPriceBeforeDiscount;
+  /// From API `localized_price` (display amount for the user’s region).
+  final String localizedPrice;
+  /// From API `localized_price_before_discount` when present; else `price_before_discount`.
+  final String localizedPriceBeforeDiscount;
   final int duration;
   final String? currency;
   final bool isActive;
@@ -22,6 +26,8 @@ class Subscription extends Equatable {
     required this.usdPrice,
     required this.priceBeforeDiscount,
     required this.usdPriceBeforeDiscount,
+    required this.localizedPrice,
+    required this.localizedPriceBeforeDiscount,
     required this.duration,
     this.currency,
     this.isActive = false,
@@ -32,14 +38,14 @@ class Subscription extends Equatable {
   String getName({bool isEnglish = false}) => isEnglish ? nameEn : nameAr;
 
   bool get hasDiscount {
-    final currentPrice = double.tryParse(price) ?? 0;
-    final originalPrice = double.tryParse(priceBeforeDiscount) ?? 0;
+    final currentPrice = double.tryParse(localizedPrice) ?? 0;
+    final originalPrice = double.tryParse(localizedPriceBeforeDiscount) ?? 0;
     return originalPrice > currentPrice;
   }
 
   int get discountPercentage {
-    final currentPrice = double.tryParse(price) ?? 0;
-    final originalPrice = double.tryParse(priceBeforeDiscount) ?? 0;
+    final currentPrice = double.tryParse(localizedPrice) ?? 0;
+    final originalPrice = double.tryParse(localizedPriceBeforeDiscount) ?? 0;
     if (originalPrice <= 0) return 0;
     return (((originalPrice - currentPrice) / originalPrice) * 100).round();
   }
@@ -58,6 +64,13 @@ class Subscription extends Equatable {
     }
   }
 
+  /// Uppercase ISO code from server; use with API `payments/process`.
+  String? get paymentCurrencyCode {
+    final c = currency?.trim();
+    if (c == null || c.isEmpty) return null;
+    return c.toUpperCase();
+  }
+
   @override
   List<Object?> get props => [
         id,
@@ -67,6 +80,8 @@ class Subscription extends Equatable {
         usdPrice,
         priceBeforeDiscount,
         usdPriceBeforeDiscount,
+        localizedPrice,
+        localizedPriceBeforeDiscount,
         duration,
         currency,
         isActive,

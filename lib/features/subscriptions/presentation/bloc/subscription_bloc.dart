@@ -265,6 +265,8 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
               usdPrice: subscription.usdPrice,
               priceBeforeDiscount: subscription.priceBeforeDiscount,
               usdPriceBeforeDiscount: subscription.usdPriceBeforeDiscount,
+              localizedPrice: subscription.localizedPrice,
+              localizedPriceBeforeDiscount: subscription.localizedPriceBeforeDiscount,
               duration: subscription.duration,
               currency: subscription.currency,
               isActive: isActive,
@@ -318,7 +320,7 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
           currentState.appliedPromoCode!.isNotEmpty &&
           currentState.discountPercentage != null &&
           newSelectedSubscription != null) {
-        final currentPrice = double.tryParse(newSelectedSubscription.price) ?? 0.0;
+        final currentPrice = double.tryParse(newSelectedSubscription.localizedPrice) ?? 0.0;
         final discountPercentage = currentState.discountPercentage!;
         final discountAmount = (currentPrice * discountPercentage / 100);
         final finalPrice = currentPrice - discountAmount;
@@ -402,7 +404,7 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
               responseData['type']?.toString().toLowerCase() ??
               'percentage';
 
-          final currentPrice = double.tryParse(selectedSubscription.price) ?? 0.0;
+          final currentPrice = double.tryParse(selectedSubscription.localizedPrice) ?? 0.0;
           double finalPrice = currentPrice;
           double? calculatedDiscountPercentage;
           double calculatedDiscountAmount = 0.0;
@@ -717,7 +719,7 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
               (s) => s.id == event.subscriptionId,
           orElse: () => currentState.subscriptions.first,
         );
-        finalPrice = double.tryParse(subscription.price) ?? 0.0;
+        finalPrice = double.tryParse(subscription.localizedPrice) ?? 0.0;
       }
     }
 

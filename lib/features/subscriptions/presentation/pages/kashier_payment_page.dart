@@ -62,8 +62,10 @@ class _KashierPaymentPageContentState extends State<_KashierPaymentPageContent> 
   bool _isLoading = false;
   String _selectedPaymentMethod = 'card';
 
-  String get _currencySymbol => CurrencyService.getCurrencySymbol();
-  String get _currencyCode => CurrencyService.getCurrencyCode();
+  String get _currencySymbol => widget.subscription.getCurrencySymbol();
+
+  String get _paymentCurrencyCode =>
+      widget.subscription.paymentCurrencyCode ?? CurrencyService.getCurrencyCode();
 
   @override
   void dispose() {
@@ -436,7 +438,7 @@ class _KashierPaymentPageContentState extends State<_KashierPaymentPageContent> 
                 ),
               )
             : Text(
-                'Pay ${widget.subscription.price} $_currencySymbol',
+                'Pay ${widget.subscription.localizedPrice} $_currencySymbol',
                 style: TextStyle(
                   fontFamily: 'Cairo',
                   fontSize: Responsive.fontSize(context, 18),
@@ -487,7 +489,7 @@ class _KashierPaymentPageContentState extends State<_KashierPaymentPageContent> 
     context.read<SubscriptionBloc>().add(
           ProcessPaymentEvent(
             service: PaymentService.kashier,
-            currency: _currencyCode,
+            currency: _paymentCurrencyCode,
             subscriptionId: widget.subscription.id,
             phone: '',
             couponCode: widget.promoCode,

@@ -70,8 +70,10 @@ class _PaymentPageContentState extends State<_PaymentPageContent> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   
-  String get _currencySymbol => CurrencyService.getCurrencySymbol();
-  String get _currencyCode => CurrencyService.getCurrencyCode();
+  String get _currencySymbol => widget.subscription.getCurrencySymbol();
+
+  String get _paymentCurrencyCode =>
+      widget.subscription.paymentCurrencyCode ?? CurrencyService.getCurrencyCode();
 
   @override
   void dispose() {
@@ -160,10 +162,12 @@ class _PaymentPageContentState extends State<_PaymentPageContent> {
     final hasCouponDiscount = widget.discountPercentage != null && 
                               widget.discountPercentage! > 0 && 
                               widget.finalPriceAfterCoupon != null;
+    final locPrice = widget.subscription.localizedPrice;
+    final locBefore = widget.subscription.localizedPriceBeforeDiscount;
     final displayPrice = hasCouponDiscount 
         ? widget.finalPriceAfterCoupon! 
-        : widget.subscription.price;
-    final originalPrice = widget.subscription.price;
+        : locPrice;
+    final originalPrice = locPrice;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -196,15 +200,13 @@ class _PaymentPageContentState extends State<_PaymentPageContent> {
             _getDurationTitle(widget.subscription.duration),
           ),
           SizedBox(height: 12),
-          if (widget.subscription.priceBeforeDiscount != widget.subscription.price &&
-              widget.subscription.priceBeforeDiscount.isNotEmpty)
+          if (locBefore != locPrice && locBefore.isNotEmpty)
             _buildSummaryRow(
               'السعر الأصلي للباقة',
-              '${widget.subscription.priceBeforeDiscount} $_currencySymbol',
+              '$locBefore $_currencySymbol',
               isStrikethrough: true,
             ),
-          if (widget.subscription.priceBeforeDiscount != widget.subscription.price &&
-              widget.subscription.priceBeforeDiscount.isNotEmpty)
+          if (locBefore != locPrice && locBefore.isNotEmpty)
             SizedBox(height: 12),
           _buildSummaryRow(
             'سعر الباقة',
@@ -437,7 +439,7 @@ class _PaymentPageContentState extends State<_PaymentPageContent> {
                               widget.finalPriceAfterCoupon != null;
     final displayPrice = hasCouponDiscount 
         ? widget.finalPriceAfterCoupon! 
-        : widget.subscription.price;
+        : widget.subscription.localizedPrice;
 
     final isTablet = Responsive.isTablet(context);
     final double fontSize =
@@ -507,7 +509,7 @@ class _PaymentPageContentState extends State<_PaymentPageContent> {
     context.read<SubscriptionBloc>().add(
           ProcessPaymentEvent(
             service: paymentService,
-            currency: _currencyCode,
+            currency: _paymentCurrencyCode,
             subscriptionId: widget.subscription.id,
             phone: phone,
             couponCode: widget.promoCode,

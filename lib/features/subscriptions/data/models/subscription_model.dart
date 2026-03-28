@@ -9,6 +9,8 @@ class SubscriptionModel extends Subscription {
     required super.usdPrice,
     required super.priceBeforeDiscount,
     required super.usdPriceBeforeDiscount,
+    required super.localizedPrice,
+    required super.localizedPriceBeforeDiscount,
     required super.duration,
     super.currency,
     super.isActive,
@@ -25,6 +27,12 @@ class SubscriptionModel extends Subscription {
       usdPrice: _parsePrice(json['usd_price']),
       priceBeforeDiscount: _parsePrice(json['price_before_discount']),
       usdPriceBeforeDiscount: _parsePrice(json['usd_price_before_discount']),
+      localizedPrice: json['localized_price'] != null
+          ? _parsePrice(json['localized_price'])
+          : _parsePrice(json['price']),
+      localizedPriceBeforeDiscount: json['localized_price_before_discount'] != null
+          ? _parsePrice(json['localized_price_before_discount'])
+          : _parsePrice(json['price_before_discount']),
       duration: json['duration'] is String
           ? int.tryParse(json['duration']) ?? 0
           : json['duration'] ?? 0,
@@ -51,6 +59,8 @@ class SubscriptionModel extends Subscription {
       'usd_price': usdPrice,
       'price_before_discount': priceBeforeDiscount,
       'usd_price_before_discount': usdPriceBeforeDiscount,
+      'localized_price': localizedPrice,
+      'localized_price_before_discount': localizedPriceBeforeDiscount,
       'duration': duration,
       'currency': currency,
       'is_active': isActive,

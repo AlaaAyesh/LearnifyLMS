@@ -213,7 +213,6 @@ class _SubscriptionsPageContentState extends State<_SubscriptionsPageContent> wi
   }
 
   Widget _buildPlansList(BuildContext context, SubscriptionsLoaded state) {
-    final currencySymbol = CurrencyService.getCurrencySymbol();
     final isSelectedPlan = state.selectedIndex;
     final hasCouponApplied = state.appliedPromoCode != null && 
                              state.appliedPromoCode!.isNotEmpty &&
@@ -240,11 +239,9 @@ class _SubscriptionsPageContentState extends State<_SubscriptionsPageContent> wi
           child: SubscriptionPlanCard(
               plan: SubscriptionPlan(
                 title: _getDurationTitle(subscription.duration),
-                originalPrice: subscription.priceBeforeDiscount,
-                discountedPrice: subscription.price,
-                currency: subscription.currency != null && subscription.currency!.isNotEmpty
-                    ? subscription.getCurrencySymbol()
-                    : currencySymbol,
+                originalPrice: subscription.localizedPriceBeforeDiscount,
+                discountedPrice: subscription.localizedPrice,
+                currency: subscription.getCurrencySymbol(),
                 description: _getDurationDescription(subscription.duration),
                 isRecommended: isRecommended,
                 isActive: subscription.isActive,
@@ -320,9 +317,6 @@ class _SubscriptionsPageContentState extends State<_SubscriptionsPageContent> wi
   }
 
   Widget _buildPaymentSection(BuildContext context, SubscriptionsLoaded state) {
-    final selectedSubscription = state.selectedSubscription;
-    final currencySymbol = CurrencyService.getCurrencySymbol();
-    
     return Padding(
       padding: Responsive.padding(context, all: 16),
       child: Column(
@@ -409,11 +403,12 @@ class _SubscriptionsPageContentState extends State<_SubscriptionsPageContent> wi
     }
 
     final finalPrice = state.finalPriceAfterCoupon != null
-        ? double.tryParse(state.finalPriceAfterCoupon!) ?? double.tryParse(selectedSubscription.price) ?? 0.0
-        : double.tryParse(selectedSubscription.price) ?? 0.0;
+        ? double.tryParse(state.finalPriceAfterCoupon!) ?? double.tryParse(selectedSubscription.localizedPrice) ?? 0.0
+        : double.tryParse(selectedSubscription.localizedPrice) ?? 0.0;
     
     if (finalPrice == 0 && state.appliedPromoCode != null && state.appliedPromoCode!.isNotEmpty) {
-      final currencyCode = CurrencyService.getCurrencyCode();
+      final currencyCode =
+          selectedSubscription.paymentCurrencyCode ?? CurrencyService.getCurrencyCode();
       context.read<SubscriptionBloc>().add(
         ProcessPaymentEvent(
           service: PaymentService.kashier,
@@ -561,8 +556,6 @@ class _SubscriptionsPageContentState extends State<_SubscriptionsPageContent> wi
     String? promoCode,
   ) {
     final bloc = context.read<SubscriptionBloc>();
-    final currencySymbol = CurrencyService.getCurrencySymbol();
-    final currencyCode = CurrencyService.getCurrencyCode();
 
     showModalBottomSheet(
       context: context,
@@ -574,6 +567,10 @@ class _SubscriptionsPageContentState extends State<_SubscriptionsPageContent> wi
         ),
       ),
       builder: (ctx) {
+        final paymentCurrency =
+            selectedSubscription.paymentCurrencyCode ?? CurrencyService.getCurrencyCode();
+        final currencySymbol = selectedSubscription.getCurrencySymbol();
+
         return BlocProvider.value(
           value: bloc,
           child: BlocBuilder<SubscriptionBloc, SubscriptionState>(
@@ -591,7 +588,7 @@ class _SubscriptionsPageContentState extends State<_SubscriptionsPageContent> wi
                 discountPercentage = state.discountPercentage;
                 appliedCouponCode = state.appliedPromoCode;
               } else {
-                amount = selectedSubscription.price;
+                amount = selectedSubscription.localizedPrice;
               }
 
               return BlocListener<SubscriptionBloc, SubscriptionState>(
@@ -672,7 +669,7 @@ class _SubscriptionsPageContentState extends State<_SubscriptionsPageContent> wi
                           bloc.add(
                             ProcessPaymentEvent(
                               service: PaymentService.kashier,
-                              currency: currencyCode,
+                              currency: paymentCurrency,
                               subscriptionId: selectedSubscription.id,
                               phone: '',
                               couponCode: appliedCouponCode,
@@ -690,7 +687,7 @@ class _SubscriptionsPageContentState extends State<_SubscriptionsPageContent> wi
                             bloc.add(
                               ProcessPaymentEvent(
                                 service: PaymentService.gplay,
-                                currency: currencyCode,
+                                currency: paymentCurrency,
                                 subscriptionId: selectedSubscription.id,
                                 phone: '',
                                 couponCode: appliedCouponCode,
@@ -708,7 +705,7 @@ class _SubscriptionsPageContentState extends State<_SubscriptionsPageContent> wi
                             bloc.add(
                               ProcessPaymentEvent(
                                 service: PaymentService.iap,
-                                currency: currencyCode,
+                                currency: paymentCurrency,
                                 subscriptionId: selectedSubscription.id,
                                 phone: '',
                                 couponCode: appliedCouponCode,
@@ -732,7 +729,7 @@ class _SubscriptionsPageContentState extends State<_SubscriptionsPageContent> wi
                               ),
                             ),
                             Text(
-                              '${selectedSubscription.price} $currencySymbol',
+                              '${selectedSubscription.localizedPriceBeforeDiscount} $currencySymbol',
                               style: TextStyle(
                                 fontFamily: 'Cairo',
                                 fontSize: Responsive.fontSize(ctx, 12),
@@ -766,7 +763,7 @@ class _SubscriptionsPageContentState extends State<_SubscriptionsPageContent> wi
                               ),
                             ),
                             Text(
-                              '-${((double.tryParse(selectedSubscription.price) ?? 0) - (double.tryParse(amount) ?? 0)).toStringAsFixed(2).replaceAll(RegExp(r'\.?0+$'), '')} $currencySymbol',
+                              '-${((double.tryParse(selectedSubscription.localizedPrice) ?? 0) - (double.tryParse(amount) ?? 0)).toStringAsFixed(2).replaceAll(RegExp(r'\.?0+$'), '')} $currencySymbol',
                               style: TextStyle(
                                 fontFamily: 'Cairo',
                                 fontSize: Responsive.fontSize(ctx, 12),

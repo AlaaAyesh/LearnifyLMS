@@ -17,7 +17,8 @@ val useReleaseSigning = hasKeystore && releaseStoreFile?.exists() == true
 
 
 android {
-    namespace = "com.example.learnify_lms"
+    // Keep namespace aligned with applicationId for Android auth/OAuth flows
+    namespace = "com.learnify_lms"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "27.0.12077973"
 

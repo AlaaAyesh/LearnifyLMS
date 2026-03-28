@@ -87,6 +87,7 @@ class _LessonPlayerPageContentState extends State<_LessonPlayerPageContent> {
   bool _hasMarkedAsViewed = false;
   WebViewController? _videoController;
   String? _currentVideoUrl;
+  final GlobalKey _bunnyPlayerKey = GlobalKey();
 
   DateTime? _videoStartTime;
   Timer? _progressTimer;
@@ -108,6 +109,32 @@ class _LessonPlayerPageContentState extends State<_LessonPlayerPageContent> {
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
+
+    // نبدأ بوضع الواجهة في حالة العمودي (نفس main.dart) لتجنّب أي فلاش غريب
+    _updateSystemUiForOrientation(Orientation.portrait);
+  }
+
+  void _updateSystemUiForOrientation(Orientation orientation) {
+    if (orientation == Orientation.landscape) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      SystemChrome.setSystemUIOverlayStyle(
+        const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+        ),
+      );
+    } else {
+      SystemChrome.setEnabledSystemUIMode(
+        SystemUiMode.manual,
+        overlays: [SystemUiOverlay.top],
+      );
+      SystemChrome.setSystemUIOverlayStyle(
+        const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.dark,
+        ),
+      );
+    }
   }
 
   Future<void> _checkAuthentication() async {
@@ -147,6 +174,16 @@ class _LessonPlayerPageContentState extends State<_LessonPlayerPageContent> {
 
     // استعادة قفل الشاشة عمودياً عند الخروج من مشغّل الدروس
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: [SystemUiOverlay.top],
+    );
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+      ),
+    );
     super.dispose();
   }
 
@@ -393,14 +430,39 @@ class _LessonPlayerPageContentState extends State<_LessonPlayerPageContent> {
   }
 
   Widget _buildLoadingScreen() {
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: CustomAppBar(
-        title: 'جاري التحميل',
-        onBack: () => Navigator.pop(context, _currentProgress),
-      ),
-      body: Center(
-        child: CircularProgressIndicator(color: AppColors.primary),
+      appBar: isLandscape
+          ? null
+          : CustomAppBar(
+              title: 'جاري التحميل',
+              onBack: () => Navigator.pop(context, _currentProgress),
+            ),
+      body: Stack(
+        children: [
+          Center(
+            child: CircularProgressIndicator(color: AppColors.primary),
+          ),
+          if (isLandscape)
+            SafeArea(
+              child: Align(
+                alignment: AlignmentDirectional.topStart,
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: IconButton(
+                    onPressed: () => Navigator.pop(context, _currentProgress),
+                    icon: const Icon(Icons.arrow_back_ios_new),
+                    color: Colors.black,
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.white70,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -418,7 +480,15 @@ class _LessonPlayerPageContentState extends State<_LessonPlayerPageContent> {
       });
     }
 
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final orientation = MediaQuery.of(context).orientation;
+    final isLandscape = orientation == Orientation.landscape;
+
+    // نحدّث وضع الـ System UI بعد كل إعادة بناء بناءً على الاتجاه الحالي
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _updateSystemUiForOrientation(orientation);
+      }
+    });
 
     // في الوضع الأفقي: الفيديو فول سكرين فقط لتجنب الـ overflow وتحسين المشاهدة
     if (isLandscape) {
@@ -429,6 +499,7 @@ class _LessonPlayerPageContentState extends State<_LessonPlayerPageContent> {
           children: [
             Positioned.fill(
               child: BunnyVideoPlayer(
+                key: _bunnyPlayerKey,
                 videoUrl: videoUrl,
                 onVideoLoaded: () {
                   _onVideoLoaded();
@@ -474,6 +545,7 @@ class _LessonPlayerPageContentState extends State<_LessonPlayerPageContent> {
             AspectRatio(
               aspectRatio: 16 / 9,
               child: BunnyVideoPlayer(
+                key: _bunnyPlayerKey,
                 videoUrl: videoUrl,
                 onVideoLoaded: () {
                   _onVideoLoaded();
@@ -1022,40 +1094,65 @@ class _LessonPlayerPageContentState extends State<_LessonPlayerPageContent> {
   }
 
   Widget _buildNoVideoScreen(Lesson lesson) {
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: CustomAppBar(
-        title: lesson.nameAr,
-        onBack: () => Navigator.pop(context, _currentProgress),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.video_library_outlined,
-                size: Responsive.iconSize(context, 80),
-                color: Colors.grey[400]),
-            SizedBox(height: Responsive.spacing(context, 16)),
-            Text(
-              'الفيديو غير متاح حالياً',
-              style: TextStyle(
-                fontFamily: 'Cairo',
-                fontSize: Responsive.fontSize(context, 18),
-                color: AppColors.textSecondary,
+      appBar: isLandscape
+          ? null
+          : CustomAppBar(
+              title: lesson.nameAr,
+              onBack: () => Navigator.pop(context, _currentProgress),
+            ),
+      body: Stack(
+        children: [
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.video_library_outlined,
+                    size: Responsive.iconSize(context, 80),
+                    color: Colors.grey[400]),
+                SizedBox(height: Responsive.spacing(context, 16)),
+                Text(
+                  'الفيديو غير متاح حالياً',
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontSize: Responsive.fontSize(context, 18),
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                if (lesson.videoStatus != null) ...[
+                  SizedBox(height: Responsive.spacing(context, 8)),
+                  Text(
+                    'الحالة: ${lesson.videoStatus}',
+                    style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontSize: Responsive.fontSize(context, 14),
+                        color: Colors.grey[500]),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (isLandscape)
+            SafeArea(
+              child: Align(
+                alignment: AlignmentDirectional.topStart,
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: IconButton(
+                    onPressed: () => Navigator.pop(context, _currentProgress),
+                    icon: const Icon(Icons.arrow_back_ios_new),
+                    color: Colors.black,
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.white70,
+                    ),
+                  ),
+                ),
               ),
             ),
-            if (lesson.videoStatus != null) ...[
-              SizedBox(height: Responsive.spacing(context, 8)),
-              Text(
-                'الحالة: ${lesson.videoStatus}',
-                style: TextStyle(
-                    fontFamily: 'Cairo',
-                    fontSize: Responsive.fontSize(context, 14),
-                    color: Colors.grey[500]),
-              ),
-            ],
-          ],
-        ),
+        ],
       ),
     );
   }

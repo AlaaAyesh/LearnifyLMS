@@ -133,6 +133,8 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
 
     if (widget.isTabActive != oldWidget.isTabActive) {
       if (widget.isTabActive) {
+        // تأمين عدم إطفاء الشاشة عند تفعيل تبويب الشورتس
+        WakelockPlus.enable();
         _setDarkStatusBar();
         if (widget.initialReel == null &&
             !widget.hideCategoryFilters &&
@@ -206,6 +208,8 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
   @override
   void didPush() {
     setState(() => _isPageVisible = true);
+    // عند فتح صفحة الريلز، نضمن بقاء الشاشة فعّالة
+    WakelockPlus.enable();
   }
 
   @override
@@ -216,6 +220,10 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
         _setDarkStatusBar();
       }
     });
+    // عند الرجوع مرة أخرى من صفحة أخرى، نفعّل الـ wakelock لو الصفحة مرئية
+    if (widget.isTabActive) {
+      WakelockPlus.enable();
+    }
     if (isReelNativePlayerSupported) reelControllerPool.disposeAll();
   }
 
