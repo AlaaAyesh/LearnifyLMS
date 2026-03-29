@@ -10,7 +10,7 @@ class Subscription extends Equatable {
   final String usdPriceBeforeDiscount;
   /// From API `localized_price` (display amount for the user’s region).
   final String localizedPrice;
-  /// From API `localized_price_before_discount` when present; else `price_before_discount`.
+  /// From API `localized_price_before_discount`.
   final String localizedPriceBeforeDiscount;
   final int duration;
   final String? currency;

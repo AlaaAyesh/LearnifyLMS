@@ -71,6 +71,15 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
 
   Timer? _filterDebounceTimer;
 
+  // بنخزن الكاتيجوري اللي هنحمّلها “بعد ما نخلص” الحالية،
+  // وبنحدّد بالظبط الـ PageView index بداية أول Reel منها.
+  // ده عشان ما يحصلش تغيير عشوائي للكاتيجوري قبل ما فعليا نطلع للـ next reels.
+  int? _pendingNextCategoryStartIndex;
+  int? _pendingNextCategoryId;
+  int? _pendingNextCategoryIndex;
+  int _autoAdvanceAttempts = 0;
+  bool _isTransitioningCategory = false;
+
   @override
   void initState() {
     super.initState();
@@ -158,6 +167,9 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
                     _selectedCategoryIndex = -1;
                     _activeCategoryId = null;
                     _lastFilteredCategoryId = null;
+                    _pendingNextCategoryStartIndex = null;
+                    _pendingNextCategoryId = null;
+                    _pendingNextCategoryIndex = null;
                     _pageViewResetToken++;
                     if (isReelNativePlayerSupported) reelControllerPool.disposeAll();
                     bloc.add(
@@ -180,6 +192,9 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
                     _selectedCategoryIndex = -1;
                     _activeCategoryId = null;
                     _lastFilteredCategoryId = null;
+                    _pendingNextCategoryStartIndex = null;
+                    _pendingNextCategoryId = null;
+                    _pendingNextCategoryIndex = null;
                     _pageViewResetToken++;
                     if (isReelNativePlayerSupported) reelControllerPool.disposeAll();
                     bloc.add(
@@ -470,6 +485,29 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
                 });
               }
 
+              if (state is ReelsLoaded && state.reels.isNotEmpty) {
+                _autoAdvanceAttempts = 0;
+              }
+
+              if (state is ReelsLoaded && !state.isLoadingMore) {
+                _isTransitioningCategory = false;
+              }
+
+              // لو الكاتيجوري الحالية طلعت فاضية، نكمّل تلقائيًا على اللي بعدها
+              // لحد عدد الكاتيجوريز المتاحة كحد أمان ضد الدوران اللانهائي.
+              if (state is ReelsLoaded &&
+                  state.reels.isEmpty &&
+                  !state.isLoadingMore &&
+                  !_isFiltering &&
+                  _selectedCategoryIndex >= 0 &&
+                  _categories.isNotEmpty &&
+                  _autoAdvanceAttempts < _categories.length) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted) return;
+                  _loadNextCategoryIfAvailable(state);
+                });
+              }
+
               if (state is ReelsEmpty && _isFiltering) {
                 setState(() {
                   _isFiltering = false;
@@ -483,6 +521,10 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
                 setState(() {
                   _isFiltering = false;
                 });
+              }
+
+              if (state is ReelsError || state is ReelsEmpty) {
+                _isTransitioningCategory = false;
               }
             },
             builder: (context, state) {
@@ -707,8 +749,12 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
                   _activeCategoryId = null;
                   _lastFilteredCategoryId = null;
                   _shouldResetOnNextLoad = false;
+                  _pendingNextCategoryStartIndex = null;
+                  _pendingNextCategoryId = null;
+                  _pendingNextCategoryIndex = null;
                   _currentIndex = 0;
                   _playbackIndex = 0;
+                  _autoAdvanceAttempts = 0;
                 });
 
                 if (_pageController.hasClients) {
@@ -742,8 +788,12 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
                   _activeCategoryId = category.id;
                   _lastFilteredCategoryId = category.id;
                   _shouldResetOnNextLoad = false;
+                  _pendingNextCategoryStartIndex = null;
+                  _pendingNextCategoryId = null;
+                  _pendingNextCategoryIndex = null;
                   _currentIndex = 0;
                   _playbackIndex = 0;
+                  _autoAdvanceAttempts = 0;
                 });
 
                 if (_pageController.hasClients) {
@@ -848,31 +898,6 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
       onPageChanged: (index) {
         setState(() {
           _currentIndex = index;
-
-          // في وضع الكل (بدون اختيار كاتيجوري) ما نغيّرش التاب تلقائيًا
-          // وكذلك لا نعدل التاب لأول صفحة بعد ما اليوزر يختار الكاتيجوري لأول مرة (index == 0)
-          if (_selectedCategoryIndex >= 0 &&
-              index > 0 &&
-              !widget.hideCategoryFilters &&
-              widget.initialReel == null &&
-              _categories.isNotEmpty &&
-              index >= 0 &&
-              index < state.reels.length) {
-            final reel = state.reels[index];
-            if (reel.categories.isNotEmpty) {
-              final reelCategoryIds =
-                  reel.categories.map((c) => c.id).toSet();
-              final newCategoryIndex = _categories.indexWhere(
-                (c) => reelCategoryIds.contains(c.id),
-              );
-              if (newCategoryIndex != -1 &&
-                  newCategoryIndex != _selectedCategoryIndex) {
-                _selectedCategoryIndex = newCategoryIndex;
-                _activeCategoryId = _categories[newCategoryIndex].id;
-                _lastFilteredCategoryId = _activeCategoryId;
-              }
-            }
-          }
         });
         _pageChangeDebounce?.cancel();
         _pageChangeDebounce = Timer(const Duration(milliseconds: 200), () {
@@ -904,8 +929,11 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
           return;
         }
 
-        if ((isNearEnd || isLoaderIndex) && !state.hasMore && !state.isLoadingMore) {
-          _loadNextCategoryIfAvailable();
+        if ((isNearEnd || isLoaderIndex) &&
+            !state.hasMore &&
+            !state.isLoadingMore &&
+            !_isTransitioningCategory) {
+          _loadNextCategoryIfAvailable(state);
         }
       },
       itemBuilder: (context, index) {
@@ -1032,11 +1060,42 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
     return (startIndex + 1) % _categories.length;
   }
 
-  void _loadNextCategoryIfAvailable() {
+  void _loadNextCategoryIfAvailable(ReelsLoaded currentState) {
     if (!mounted) return;
+    if (_categories.isEmpty) return;
+    if (_autoAdvanceAttempts >= _categories.length) return;
+    if (_isTransitioningCategory) return;
     final nextCategoryIndex = _getNextCategoryIndex();
     if (nextCategoryIndex == null) return;
     final nextCategory = _categories[nextCategoryIndex];
+    _autoAdvanceAttempts++;
+    _isTransitioningCategory = true;
+
+    // بنبدّل الكاتيجوري UI فوراً، والـ BLoC هيستبدل الريلز نفسها
+    // (Replace وليس append) عشان ما تظهرش فيديوهات غير تابعة.
+    setState(() {
+      _selectedCategoryIndex = nextCategoryIndex;
+      _activeCategoryId = nextCategory.id;
+      _lastFilteredCategoryId = nextCategory.id;
+
+      _pendingNextCategoryStartIndex = null;
+      _pendingNextCategoryId = null;
+      _pendingNextCategoryIndex = null;
+
+      _currentIndex = 0;
+      _playbackIndex = 0;
+      _pageViewResetToken++;
+    });
+
+    if (isReelNativePlayerSupported) reelControllerPool.disposeAll();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_pageController.hasClients) {
+        _pageController.jumpToPage(0);
+      }
+    });
+
     try {
       context
           .read<ReelsBloc>()

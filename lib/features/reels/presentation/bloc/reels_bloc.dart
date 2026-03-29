@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../data/models/reel_category_model.dart';
+import '../../domain/entities/reel.dart';
 import '../../domain/usecases/get_reels_feed_usecase.dart';
 import '../../domain/usecases/record_reel_view_usecase.dart';
 import '../../domain/usecases/toggle_reel_like_usecase.dart';
@@ -49,6 +50,13 @@ class ReelsBloc extends Bloc<ReelsEvent, ReelsState> {
     on<LoadMoreUserReelsEvent>(_onLoadMoreUserReels);
     on<LoadUserLikedReelsEvent>(_onLoadUserLikedReels);
     on<LoadMoreUserLikedReelsEvent>(_onLoadMoreUserLikedReels);
+  }
+
+  List<Reel> _filterReelsByCategory(List<Reel> reels, int? categoryId) {
+    if (categoryId == null) return reels;
+    return reels
+        .where((reel) => reel.categories.any((category) => category.id == categoryId))
+        .toList();
   }
 
   void _onSeedReelsList(
@@ -148,11 +156,13 @@ class ReelsBloc extends Bloc<ReelsEvent, ReelsState> {
           return;
         }
 
-        if (response.reels.isEmpty) {
+        final filteredReels = _filterReelsByCategory(response.reels, _currentCategoryId);
+
+        if (filteredReels.isEmpty) {
           emit(const ReelsEmpty());
         } else {
           final likedReels = <int, bool>{};
-          for (final reel in response.reels) {
+          for (final reel in filteredReels) {
             likedReels[reel.id] = reel.liked;
             if (reel.viewed) {
               _viewedReelIds.add(reel.id);
@@ -160,7 +170,7 @@ class ReelsBloc extends Bloc<ReelsEvent, ReelsState> {
           }
 
           emit(ReelsLoaded(
-            reels: response.reels,
+            reels: filteredReels,
             nextCursor: response.meta.nextCursor,
             nextPageUrl: response.meta.nextPageUrl,
             hasMore: response.meta.hasMore,
@@ -179,7 +189,17 @@ class ReelsBloc extends Bloc<ReelsEvent, ReelsState> {
     final currentState = state;
     if (currentState is! ReelsLoaded) return;
 
-    emit(currentState.copyWith(isLoadingMore: true));
+    // أثناء التحميل للكاتيجوري التالية
+    // بنمسح الريلز القديمة مؤقتاً عشان ما يظهرش محتوى من كاتيجوري سابقة
+    // لحد ما الاستجابة ترجع.
+    final loadingState = currentState.copyWith(
+      reels: <Reel>[],
+      nextCursor: null,
+      nextPageUrl: null,
+      hasMore: false,
+      isLoadingMore: true,
+    );
+    emit(loadingState);
 
     _currentCategoryId = event.categoryId;
 
@@ -189,10 +209,12 @@ class ReelsBloc extends Bloc<ReelsEvent, ReelsState> {
     );
 
     result.fold(
-      (failure) => emit(currentState.copyWith(isLoadingMore: false)),
+      (failure) => emit(loadingState.copyWith(isLoadingMore: false)),
       (response) {
-        if (response.reels.isEmpty) {
-          emit(currentState.copyWith(
+        final filteredReels = _filterReelsByCategory(response.reels, _currentCategoryId);
+
+        if (filteredReels.isEmpty) {
+          emit(loadingState.copyWith(
             hasMore: false,
             isLoadingMore: false,
             nextCursor: null,
@@ -201,16 +223,20 @@ class ReelsBloc extends Bloc<ReelsEvent, ReelsState> {
           return;
         }
 
-        final newLikedReels = Map<int, bool>.from(currentState.likedReels);
-        for (final reel in response.reels) {
+        final newLikedReels = Map<int, bool>.from(loadingState.likedReels);
+        for (final reel in filteredReels) {
           newLikedReels[reel.id] = reel.liked;
           if (reel.viewed) {
             _viewedReelIds.add(reel.id);
           }
         }
 
-        emit(currentState.copyWith(
-          reels: [...currentState.reels, ...response.reels],
+        emit(loadingState.copyWith(
+          // Important: عند الانتقال للكاتيجوري التالية
+          // لازم نستبدل الريلز بدل ما نعمل append،
+          // عشان ميبقاش فيه ظهور لريلز من كاتيجوري سابقة
+          // بعد ما الكاتيجوري اتغيرت.
+          reels: filteredReels,
           nextCursor: response.meta.nextCursor,
           nextPageUrl: response.meta.nextPageUrl,
           hasMore: response.meta.hasMore,
@@ -243,8 +269,9 @@ class ReelsBloc extends Bloc<ReelsEvent, ReelsState> {
         emit(currentState.copyWith(isLoadingMore: false));
       },
       (response) {
+        final filteredReels = _filterReelsByCategory(response.reels, _currentCategoryId);
         final newLikedReels = Map<int, bool>.from(currentState.likedReels);
-        for (final reel in response.reels) {
+        for (final reel in filteredReels) {
           newLikedReels[reel.id] = reel.liked;
           if (reel.viewed) {
             _viewedReelIds.add(reel.id);
@@ -252,7 +279,7 @@ class ReelsBloc extends Bloc<ReelsEvent, ReelsState> {
         }
 
         emit(currentState.copyWith(
-          reels: [...currentState.reels, ...response.reels],
+          reels: [...currentState.reels, ...filteredReels],
           nextCursor: response.meta.nextCursor,
           nextPageUrl: response.meta.nextPageUrl,
           hasMore: response.meta.hasMore,

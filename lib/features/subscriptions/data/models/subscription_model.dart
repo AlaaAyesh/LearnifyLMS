@@ -27,12 +27,8 @@ class SubscriptionModel extends Subscription {
       usdPrice: _parsePrice(json['usd_price']),
       priceBeforeDiscount: _parsePrice(json['price_before_discount']),
       usdPriceBeforeDiscount: _parsePrice(json['usd_price_before_discount']),
-      localizedPrice: json['localized_price'] != null
-          ? _parsePrice(json['localized_price'])
-          : _parsePrice(json['price']),
-      localizedPriceBeforeDiscount: json['localized_price_before_discount'] != null
-          ? _parsePrice(json['localized_price_before_discount'])
-          : _parsePrice(json['price_before_discount']),
+      localizedPrice: _resolveLocalizedPrice(json),
+      localizedPriceBeforeDiscount: _resolveLocalizedPriceBeforeDiscount(json),
       duration: json['duration'] is String
           ? int.tryParse(json['duration']) ?? 0
           : json['duration'] ?? 0,
@@ -48,6 +44,14 @@ class SubscriptionModel extends Subscription {
     if (value is String) return value;
     if (value is num) return value.toString();
     return '0';
+  }
+
+  static String _resolveLocalizedPrice(Map<String, dynamic> json) {
+    return _parsePrice(json['localized_price']);
+  }
+
+  static String _resolveLocalizedPriceBeforeDiscount(Map<String, dynamic> json) {
+    return _parsePrice(json['localized_price_before_discount']);
   }
 
   Map<String, dynamic> toJson() {
