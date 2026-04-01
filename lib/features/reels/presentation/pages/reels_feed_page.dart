@@ -40,7 +40,7 @@ class ReelsFeedPage extends StatefulWidget {
     super.key,
     this.initialIndex = 0,
     this.showBackButton = true,
-    this.freeReelsLimit = 5,
+    this.freeReelsLimit = 10,
     this.isTabActive = false,
     this.hideCategoryFilters = false,
     this.initialReel,
@@ -699,7 +699,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
             },
           ),
 
-          if (!(_currentIndex == 0 && !_isSubscribed))
+          if (!(!_isSubscribed && _currentIndex == widget.freeReelsLimit))
             _ReelsHeaderOverlay(
               topPadding: topPadding,
               showBackButton: widget.showBackButton,
@@ -878,15 +878,17 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
   }
 
   Widget _buildReelsFeed(BuildContext context, ReelsLoaded state) {
+    final visibleReelsCount = _isSubscribed
+        ? state.reels.length
+        : state.reels.length.clamp(0, widget.freeReelsLimit);
+    final hasReachedFreeLimit =
+        !_isSubscribed && state.reels.length >= widget.freeReelsLimit;
     final hasNextCategory = _getNextCategoryIndex() != null;
-    final itemCount = state.reels.isEmpty && !_isSubscribed
-        ? 1
-        : state.reels.length +
-            ((state.hasMore ||
-                    state.isLoadingMore ||
-                    (!state.hasMore && hasNextCategory))
-                ? 1
-                : 0);
+    final showLoaderItem = !hasReachedFreeLimit &&
+        (state.hasMore || state.isLoadingMore || (!state.hasMore && hasNextCategory));
+    final itemCount = hasReachedFreeLimit
+        ? visibleReelsCount + 1
+        : visibleReelsCount + (showLoaderItem ? 1 : 0);
 
     final pageViewKey = ValueKey('reels_feed_$_pageViewResetToken');
 
@@ -914,12 +916,16 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
 
         _checkPaywall(index);
 
+        if (hasReachedFreeLimit && index >= widget.freeReelsLimit) {
+          return;
+        }
+
         const paginationTriggerOffset = 2;
-        final thresholdIndex = state.reels.isNotEmpty
-            ? (state.reels.length - paginationTriggerOffset).clamp(0, state.reels.length)
+        final thresholdIndex = visibleReelsCount > 0
+            ? (visibleReelsCount - paginationTriggerOffset).clamp(0, visibleReelsCount)
             : 0;
-        final isNearEnd = state.reels.isNotEmpty && index >= thresholdIndex;
-        final isLoaderIndex = index >= state.reels.length;
+        final isNearEnd = visibleReelsCount > 0 && index >= thresholdIndex;
+        final isLoaderIndex = index >= visibleReelsCount;
 
         if (isNearEnd && state.hasMore && !state.isLoadingMore) {
           try {
@@ -938,9 +944,9 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
         }
       },
       itemBuilder: (context, index) {
-        if (index == 0 && !_isSubscribed) {
+        if (hasReachedFreeLimit && index == widget.freeReelsLimit) {
           final thumbnailUrl =
-              state.reels.isNotEmpty ? state.reels[0].thumbnailUrl : null;
+              state.reels.isNotEmpty ? state.reels[widget.freeReelsLimit - 1].thumbnailUrl : null;
           return ReelPaywallWidget(
             onSubscribe: _handleSubscribe,
             thumbnailUrl: thumbnailUrl,
@@ -955,7 +961,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
           );
         }
 
-        if (index >= state.reels.length) {
+        if (index >= visibleReelsCount) {
           return const Center(
             child: CircularProgressIndicator(
               color: AppColors.primary,

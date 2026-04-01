@@ -29,7 +29,7 @@ class ReelModel extends Reel {
       description: json['description']?.toString() ?? '',
       redirectType: json['redirect_type']?.toString() ?? '',
       redirectLink: json['redirect_link']?.toString() ?? '',
-      thumbnailUrl: json['thumbnail_url']?.toString() ?? '',
+      thumbnailUrl: _parseThumbnailUrl(json),
       bunnyUrl: json['bunny_url']?.toString() ?? '',
       durationSeconds: _parseInt(json['duration_seconds']),
       likesCount: _parseInt(json['likes_count']),
@@ -84,6 +84,33 @@ class ReelModel extends Reel {
     if (value is int) return value == 1;
     if (value is String) return value == '1' || value.toLowerCase() == 'true';
     return false;
+  }
+
+  static String _parseThumbnailUrl(Map<String, dynamic> json) {
+    final candidates = [
+      json['thumbnail_url'],
+      json['thumbnailUrl'],
+      json['thumbnail'],
+      json['poster_url'],
+      json['image'],
+    ];
+
+    for (final candidate in candidates) {
+      if (candidate == null) continue;
+
+      if (candidate is String && candidate.trim().isNotEmpty) {
+        return candidate.trim();
+      }
+
+      if (candidate is Map<String, dynamic>) {
+        final nested = candidate['url']?.toString();
+        if (nested != null && nested.trim().isNotEmpty) {
+          return nested.trim();
+        }
+      }
+    }
+
+    return '';
   }
 }
 
