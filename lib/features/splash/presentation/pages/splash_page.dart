@@ -6,6 +6,7 @@ import '../../../../core/di/injection_container.dart';
 import '../../../../core/storage/hive_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/responsive.dart';
+import '../../../authentication/domain/repositories/auth_repository.dart';
 import '../../../authentication/presentation/bloc/auth_bloc.dart';
 import '../../../authentication/presentation/bloc/auth_event.dart';
 import '../../../authentication/presentation/bloc/auth_state.dart';
@@ -47,6 +48,22 @@ class _SplashPageState extends State<SplashPage>
     _animationController.forward();
   }
 
+  /// يحدّث بيانات المستخدم من `auth/loggedInUser` عند وجود توكن (مثلاً بعد إغلاق/فتح التطبيق).
+  Future<void> _refreshLoggedInUserIfSessionExists() async {
+    final repo = sl<AuthRepository>();
+    final authBloc = context.read<AuthBloc>();
+    final isLoggedInResult = await repo.isLoggedIn();
+    await isLoggedInResult.fold(
+      (_) async {},
+      (isLoggedIn) async {
+        if (!isLoggedIn || !mounted) return;
+        await repo.getCurrentUserFromApi();
+        if (!mounted) return;
+        authBloc.add(CheckAuthStatusEvent());
+      },
+    );
+  }
+
   Future<void> _checkFirstTime() async {
     final hiveService = sl<HiveService>();
     final isFirstTime = await hiveService.getData(AppConstants.keyIsFirstTime);
@@ -60,21 +77,21 @@ class _SplashPageState extends State<SplashPage>
     await Future.delayed(const Duration(milliseconds: 500));
     if (!mounted) return;
 
-    final authBloc = context.read<AuthBloc>();
-
     await Future.delayed(const Duration(milliseconds: 300));
     if (!mounted) return;
-    
-    final authState = authBloc.state;
-    
+
     if (_isFirstTime) {
       await Future.delayed(const Duration(seconds: 2));
       if (!mounted) return;
 
       await hiveService.saveData(AppConstants.keyIsFirstTime, false);
 
+      await _refreshLoggedInUserIfSessionExists();
+      if (!mounted) return;
       Navigator.of(context).pushReplacementNamed('/home');
     } else {
+      await _refreshLoggedInUserIfSessionExists();
+      if (!mounted) return;
       Navigator.of(context).pushReplacementNamed('/home');
     }
   }
