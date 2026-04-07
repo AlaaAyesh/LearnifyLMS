@@ -103,7 +103,6 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
 
   bool get _shouldPlayNow => widget.isActive && _isVisibleEnough && !_isUserPaused;
 
-  /// هل النص سيأخذ أكثر من 70% من ارتفاع الشاشة عند العرض الكامل؟
   bool _descriptionExceeds70Percent(BuildContext context, String text, TextStyle style) {
     if (text.isEmpty) return false;
     final screenHeight = MediaQuery.sizeOf(context).height;
@@ -218,8 +217,6 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
       return;
     }
     
-    // Native: progress comes from BetterPlayer addEventsListener (BetterPlayerEventType.progress)
-    // Web: use timer to increment progress
     if (useWeb) {
       _progressTimer = Timer.periodic(const Duration(seconds: 1), (_) {
         if (!mounted) return;
@@ -485,7 +482,6 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
     if (_durationSeconds <= 0) return;
     if (totalWidth <= 0) return;
     
-    // الشريط يبدأ من اليمين وينتهي في اليسار: يمين = بداية (0)، يسار = نهاية (1)
     final progress = (1.0 - (tapPosition / totalWidth)).clamp(0.0, 1.0);
     final targetSeconds = (progress * _durationSeconds).round().clamp(0, _durationSeconds);
     
@@ -524,7 +520,6 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
     }
   }
 
-  /// تقديم الفيديو ثم استئناف التشغيل فوراً (بدون تجميد) مثل يوتيوب/تيك توك
   Future<void> _seekAndResume(int targetSeconds) async {
     final controller = _controller;
     if (controller == null || !mounted) return;
@@ -719,7 +714,7 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
                         builder: (context, constraints) {
                           final barWidth = constraints.maxWidth;
                           return GestureDetector(
-                            onTap: () {}, // consume tap so parent doesn't toggle play/pause
+                            onTap: () {},
                             onTapDown: (details) {
                               final RenderBox? box = context.findRenderObject() as RenderBox?;
                               if (box != null && box.hasSize) {

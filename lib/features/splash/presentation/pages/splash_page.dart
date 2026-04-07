@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
@@ -29,7 +30,14 @@ class _SplashPageState extends State<SplashPage>
   void initState() {
     super.initState();
     _initAnimation();
+    _initPushNotifications();
     _checkFirstTime();
+  }
+
+  Future<void> _initPushNotifications() async {
+    await FirebaseMessaging.instance.requestPermission();
+    final token = await FirebaseMessaging.instance.getToken();
+    debugPrint('TOKEN: $token');
   }
 
   void _initAnimation() {
@@ -48,7 +56,6 @@ class _SplashPageState extends State<SplashPage>
     _animationController.forward();
   }
 
-  /// يحدّث بيانات المستخدم من `auth/loggedInUser` عند وجود توكن (مثلاً بعد إغلاق/فتح التطبيق).
   Future<void> _refreshLoggedInUserIfSessionExists() async {
     final repo = sl<AuthRepository>();
     final authBloc = context.read<AuthBloc>();

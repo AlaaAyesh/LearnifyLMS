@@ -71,9 +71,6 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
 
   Timer? _filterDebounceTimer;
 
-  // بنخزن الكاتيجوري اللي هنحمّلها “بعد ما نخلص” الحالية،
-  // وبنحدّد بالظبط الـ PageView index بداية أول Reel منها.
-  // ده عشان ما يحصلش تغيير عشوائي للكاتيجوري قبل ما فعليا نطلع للـ next reels.
   int? _pendingNextCategoryStartIndex;
   int? _pendingNextCategoryId;
   int? _pendingNextCategoryIndex;
@@ -142,7 +139,6 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
 
     if (widget.isTabActive != oldWidget.isTabActive) {
       if (widget.isTabActive) {
-        // تأمين عدم إطفاء الشاشة عند تفعيل تبويب الشورتس
         WakelockPlus.enable();
         _setDarkStatusBar();
         if (widget.initialReel == null &&
@@ -223,7 +219,6 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
   @override
   void didPush() {
     setState(() => _isPageVisible = true);
-    // عند فتح صفحة الريلز، نضمن بقاء الشاشة فعّالة
     WakelockPlus.enable();
   }
 
@@ -235,7 +230,6 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
         _setDarkStatusBar();
       }
     });
-    // عند الرجوع مرة أخرى من صفحة أخرى، نفعّل الـ wakelock لو الصفحة مرئية
     if (widget.isTabActive) {
       WakelockPlus.enable();
     }
@@ -288,7 +282,6 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
     final user = await authLocalDataSource.getCachedUser();
 
     setState(() {
-      // Defensive fallback: subscription is not equivalent to authentication.
       _isSubscribed = user?.isSubscribed == true;
     });
   }
@@ -494,8 +487,6 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
                 _isTransitioningCategory = false;
               }
 
-              // لو الكاتيجوري الحالية طلعت فاضية، نكمّل تلقائيًا على اللي بعدها
-              // لحد عدد الكاتيجوريز المتاحة كحد أمان ضد الدوران اللانهائي.
               if (state is ReelsLoaded &&
                   state.reels.isEmpty &&
                   !state.isLoadingMore &&
@@ -1050,7 +1041,6 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
       return null;
     }
 
-    // في حالة عدم اختيار أي كاتيجوري، لا ننتقل تلقائيًا بين الكاتيجوريز
     if (_selectedCategoryIndex < 0) {
       return null;
     }
@@ -1078,8 +1068,6 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
     _autoAdvanceAttempts++;
     _isTransitioningCategory = true;
 
-    // بنبدّل الكاتيجوري UI فوراً، والـ BLoC هيستبدل الريلز نفسها
-    // (Replace وليس append) عشان ما تظهرش فيديوهات غير تابعة.
     setState(() {
       _selectedCategoryIndex = nextCategoryIndex;
       _activeCategoryId = nextCategory.id;

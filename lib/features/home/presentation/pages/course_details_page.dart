@@ -516,8 +516,6 @@ class _CourseDetailsPageState extends State<CourseDetailsPage> with RouteAware {
       return CachedNetworkImage(
         imageUrl: thumbnailUrl,
         fit: BoxFit.cover,
-        // عند وجود صورة من الباك، لا نعرض صورة الديفولت أثناء التحميل
-        // نستخدم خلفية شفافة بسيطة فقط
         placeholder: (context, url) => Container(color: Colors.transparent),
         errorWidget: (context, url, error) => _buildPlaceholder(),
       );
@@ -589,7 +587,6 @@ class _CourseDetailsPageState extends State<CourseDetailsPage> with RouteAware {
               ? constraints.maxWidth
               : MediaQuery.sizeOf(context).width - 32;
 
-          // نقرر عرض "المزيد" بناءً على مجموع محتوى about + what_you_will_learn معاً
           final String combinedText = learnItems.isNotEmpty
               ? aboutText + '\n' + learnItems.join('\n')
               : aboutText;
@@ -601,14 +598,12 @@ class _CourseDetailsPageState extends State<CourseDetailsPage> with RouteAware {
             children: [
               _buildAboutText(
                 aboutText,
-                // زر "المزيد/عرض أقل" يتحكم في الوصف + ما سوف تتعلمه معاً
                 showExpandButton: combinedExceedsThreeLines,
               ),
               if (learnItems.isNotEmpty) ...[
                 SizedBox(height: Responsive.spacing(context, 20)),
                 _buildWhatYouWillLearnList(
                   learnItems,
-                  // لا نعرض زر مستقل داخل القائمة؛ نفس الزر في الوصف يتحكم في الكل
                   showExpandButton: false,
                 ),
               ],
@@ -631,7 +626,6 @@ class _CourseDetailsPageState extends State<CourseDetailsPage> with RouteAware {
 
   static const int _aboutExpandThreshold = 100;
 
-  /// عدد الكلمات في النص (نستخدمه كقاعدة ثابتة للحكم على عدد الأسطر)
   int _wordCount(String text) {
     if (text.trim().isEmpty) return 0;
     return text
@@ -641,13 +635,11 @@ class _CourseDetailsPageState extends State<CourseDetailsPage> with RouteAware {
         .length;
   }
 
-  /// لو مجموع about + what_you_will_learn أكتر من 28 كلمة → نعتبره يتجاوز 3 أسطر
   bool _aboutExceedsThreeLines(String text, double maxWidth, TextStyle textStyle) {
     final totalWords = _wordCount(text);
     return totalWords > 25;
   }
 
-  /// عدد أحرف الوصف بحيث تبقى " ...... المزيد" في نهاية السطر الثالث
   int _truncateAboutToFit(String text, TextStyle textStyle, TextStyle linkStyle, double maxWidth) {
     const dotsAndSpace = '...';
     const moreText = 'المزيد';
@@ -713,7 +705,6 @@ class _CourseDetailsPageState extends State<CourseDetailsPage> with RouteAware {
 
     final bool showButton = showExpandButton;
 
-    // مطوي: نعرض 3 أسطر فقط + " ...... المزيد" في نهاية السطر الثالث
     if (!_courseInfoExpanded && showButton) {
       return LayoutBuilder(
         builder: (context, constraints) {
@@ -722,7 +713,6 @@ class _CourseDetailsPageState extends State<CourseDetailsPage> with RouteAware {
               : MediaQuery.sizeOf(context).width - 32;
           final len = _truncateAboutToFit(text, textStyle, linkStyle, maxWidth);
           final displayText = text.substring(0, len);
-          // إذا لم يتبقّ نص للعرض (len == 0) لا نعرض "المزيد" وحدها — نعرض النص كاملاً بدون توسيع
           if (displayText.trim().isEmpty) {
             return Text(
               text,
@@ -1869,7 +1859,6 @@ class _ChapterSection extends StatelessWidget {
               childAspectRatio = isLandscape ? 0.95 : 0.8;
             }
 
-            // نعرض الدروس بترتيبها من الأقدم إلى الأحدث
             final orderedLessons = chapter.lessons;
 
             return GridView.builder(

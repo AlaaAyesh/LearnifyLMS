@@ -2,16 +2,10 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 
-/// خدمة الشراء داخل التطبيق لـ Apple (StoreKit).
-/// تستخدم معرفات المنتجات من App Store Connect:
-/// - com.learnifykids.one_month_sub
-/// - com.learnifykids.six_month_sub
-/// - com.learnifykids.one_year_sub
 class AppleIAPService {
   final InAppPurchase _inAppPurchase = InAppPurchase.instance;
   StreamSubscription<List<PurchaseDetails>>? _purchaseSubscription;
 
-  /// خريطة معرف الباقة (من السيرفر) إلى معرف المنتج في App Store
   static const Map<int, String> productIdMap = {
     1: 'com.learnifykids.one_month_sub',
     2: 'com.learnifykids.six_month_sub',

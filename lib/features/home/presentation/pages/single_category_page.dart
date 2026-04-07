@@ -65,7 +65,6 @@ class _SingleCategoryPageState extends State<SingleCategoryPage> {
     final currentScroll = _scrollController.position.pixels;
     if (maxScroll <= 0) return;
 
-    // Trigger when user scrolls past ~80% of the current extent
     if (currentScroll >= maxScroll * 0.8) {
       setState(() {
         _visibleItemCount += _pageSize;
@@ -174,7 +173,6 @@ class _SingleCategoryPageState extends State<SingleCategoryPage> {
   }
 
   Widget _buildCoursesGrid(BuildContext context, List<Course> courses) {
-    // نعرض الدورات بترتيب عكسي (آخر دورة أولاً)
     final reversedCourses = courses.reversed.toList();
     final itemCount = _visibleItemCount.clamp(0, reversedCourses.length);
     return GridView.builder(
@@ -298,7 +296,6 @@ class _CourseGridItem extends StatelessWidget {
       return CachedNetworkImage(
         imageUrl: thumbnailUrl,
         fit: BoxFit.cover,
-        // عند وجود صورة من الباك، لا نعرض صورة الديفولت أثناء التحميل
         placeholder: (context, url) => Container(
           color: Colors.grey.shade100,
         ),

@@ -241,7 +241,6 @@ class _HomeTabContent extends StatelessWidget {
   }
 
   Widget _buildCoursesGrid(BuildContext context, List<Course> courses) {
-    // نعرض الدورات بترتيب عكسي (آخر دورة أولاً)
     final reversedCourses = courses.reversed.toList();
     return SizedBox(
       height: Responsive.height(context, 130),

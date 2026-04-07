@@ -42,7 +42,6 @@ class CoursesBloc extends Bloc<CoursesEvent, CoursesState> {
     _subscriptionUpdatedListener = globalEventBus
         .on<SubscriptionUpdatedEvent>()
         .listen((_) {
-      // Force refresh from first page to avoid stale access flags.
       _currentPage = 1;
       debugPrint('🔥 SubscriptionUpdatedEvent received in CoursesBloc');
       add(const LoadCoursesEvent(page: 1, refresh: true));

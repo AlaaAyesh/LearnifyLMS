@@ -316,21 +316,15 @@ class TransactionsResponseModel {
   });
 
   factory TransactionsResponseModel.fromJson(Map<String, dynamic> json) {
-    // API shape can be either:
-    // 1) { data: [..], meta: {..} }
-    // 2) { data: { data: [..], meta: {..} } }
-    // 3) { transactions: [..], meta: {..} }
     dynamic rawData = json['data'];
     Map<String, dynamic> meta = (json['meta'] as Map?)?.cast<String, dynamic>() ?? {};
 
     if (rawData is Map) {
-      // shape #2
       meta = (rawData['meta'] as Map?)?.cast<String, dynamic>() ?? meta;
       rawData = rawData['data'];
     }
 
     if (rawData == null && json['transactions'] is List) {
-      // shape #3
       rawData = json['transactions'];
     }
 

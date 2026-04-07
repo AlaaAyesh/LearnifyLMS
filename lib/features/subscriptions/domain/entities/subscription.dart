@@ -8,9 +8,7 @@ class Subscription extends Equatable {
   final String usdPrice;
   final String priceBeforeDiscount;
   final String usdPriceBeforeDiscount;
-  /// From API `localized_price` (display amount for the user’s region).
   final String localizedPrice;
-  /// From API `localized_price_before_discount`.
   final String localizedPriceBeforeDiscount;
   final int duration;
   final String? currency;
@@ -64,7 +62,6 @@ class Subscription extends Equatable {
     }
   }
 
-  /// Uppercase ISO code from server; use with API `payments/process`.
   String? get paymentCurrencyCode {
     final c = currency?.trim();
     if (c == null || c.isEmpty) return null;

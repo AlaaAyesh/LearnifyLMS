@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_in_app_messaging/firebase_in_app_messaging.dart';
 
 import 'app.dart';
 import 'core/di/injection_container.dart';
@@ -9,6 +11,8 @@ import 'core/network/cache_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  await FirebaseInAppMessaging.instance.setAutomaticDataCollectionEnabled(true);
 
   await Future.wait([
     HiveService.init(),

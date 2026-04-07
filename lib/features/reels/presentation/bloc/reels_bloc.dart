@@ -61,7 +61,6 @@ class ReelsBloc extends Bloc<ReelsEvent, ReelsState> {
         .on<SubscriptionUpdatedEvent>()
         .listen((_) {
       debugPrint('🔥 SubscriptionUpdatedEvent received in ReelsBloc');
-      // Refresh first page only to keep update lightweight.
       add(LoadReelsFeedEvent(perPage: _perPage, categoryId: _currentCategoryId));
     });
   }
@@ -203,9 +202,6 @@ class ReelsBloc extends Bloc<ReelsEvent, ReelsState> {
     final currentState = state;
     if (currentState is! ReelsLoaded) return;
 
-    // أثناء التحميل للكاتيجوري التالية
-    // بنمسح الريلز القديمة مؤقتاً عشان ما يظهرش محتوى من كاتيجوري سابقة
-    // لحد ما الاستجابة ترجع.
     final loadingState = currentState.copyWith(
       reels: <Reel>[],
       nextCursor: null,
@@ -246,10 +242,6 @@ class ReelsBloc extends Bloc<ReelsEvent, ReelsState> {
         }
 
         emit(loadingState.copyWith(
-          // Important: عند الانتقال للكاتيجوري التالية
-          // لازم نستبدل الريلز بدل ما نعمل append،
-          // عشان ميبقاش فيه ظهور لريلز من كاتيجوري سابقة
-          // بعد ما الكاتيجوري اتغيرت.
           reels: filteredReels,
           nextCursor: response.meta.nextCursor,
           nextPageUrl: response.meta.nextPageUrl,

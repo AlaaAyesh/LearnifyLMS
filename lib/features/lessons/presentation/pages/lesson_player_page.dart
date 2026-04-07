@@ -102,7 +102,6 @@ class _LessonPlayerPageContentState extends State<_LessonPlayerPageContent> {
     _checkAuthentication();
     WakelockPlus.enable();
 
-    // السماح بالدوران في شاشة مشغّل الدروس فقط
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -110,7 +109,6 @@ class _LessonPlayerPageContentState extends State<_LessonPlayerPageContent> {
       DeviceOrientation.landscapeRight,
     ]);
 
-    // نبدأ بوضع الواجهة في حالة العمودي (نفس main.dart) لتجنّب أي فلاش غريب
     _updateSystemUiForOrientation(Orientation.portrait);
   }
 
@@ -172,7 +170,6 @@ class _LessonPlayerPageContentState extends State<_LessonPlayerPageContent> {
       }
     }
 
-    // استعادة قفل الشاشة عمودياً عند الخروج من مشغّل الدروس
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     SystemChrome.setEnabledSystemUIMode(
       SystemUiMode.manual,
@@ -483,14 +480,12 @@ class _LessonPlayerPageContentState extends State<_LessonPlayerPageContent> {
     final orientation = MediaQuery.of(context).orientation;
     final isLandscape = orientation == Orientation.landscape;
 
-    // نحدّث وضع الـ System UI بعد كل إعادة بناء بناءً على الاتجاه الحالي
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _updateSystemUiForOrientation(orientation);
       }
     });
 
-    // في الوضع الأفقي: الفيديو فول سكرين فقط لتجنب الـ overflow وتحسين المشاهدة
     if (isLandscape) {
       return Scaffold(
         backgroundColor: Colors.black,
@@ -530,7 +525,6 @@ class _LessonPlayerPageContentState extends State<_LessonPlayerPageContent> {
       );
     }
 
-    // الوضع العمودي: التخطيط المعتاد (فيديو + قائمة الدروس)
     final String appBarTitle = widget.course?.nameAr ?? lesson.nameAr;
 
     return Scaffold(
@@ -775,7 +769,6 @@ class _LessonPlayerPageContentState extends State<_LessonPlayerPageContent> {
                 ],
               ),
             ),
-            // نعرض الدروس من الأقدم إلى الأحدث في شاشة المشغّل
             ...chapter.lessons.map((lesson) {
               final isCurrent = lesson.id == currentLesson.id;
               final isViewed = lesson.viewed;

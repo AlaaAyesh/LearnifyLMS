@@ -103,8 +103,6 @@ class CourseGridCard extends StatelessWidget {
         fit: BoxFit.cover,
         memCacheWidth: cacheSize,
         memCacheHeight: cacheSize,
-        // عند وجود صورة من الباك، لا نعرض صورة الديفولت أثناء التحميل
-        // بل نستخدم حاوية بلون خفيف حتى لا يظهر فلاش الصورة الافتراضية
         placeholder: (context, url) => Container(
           color: Colors.grey.shade100,
         ),
