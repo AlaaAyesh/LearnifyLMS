@@ -1,0 +1,17 @@
+{
+  "project": "learnify_lms",
+  "platform": "ios",
+  "github": {
+    "owner": "AlaaAyesh",
+    "repo": "LearnifyLMS"
+  },
+  "ios": {
+    "path": "ios",
+    "scheme": "",
+    "signing": false,
+    "configuration": "Release"
+  },
+  "flutter": {
+    "version": "3.41.3"
+  }
+}
