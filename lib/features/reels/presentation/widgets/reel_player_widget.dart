@@ -62,6 +62,7 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
   bool _showThumbnailOverlay = true;
   bool _isWebInitialized = false;
   bool _nativeFailed = false;
+  bool _nativeStarted = false;
   bool _isUserPaused = false;
   bool _webIsShowingPausedFrame = false;
   bool _isVisibleEnough = false;
@@ -105,6 +106,13 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
     final duration = params['duration'] as Duration?;
     if (progress == null || duration == null || duration.inSeconds <= 0) return;
     if (!mounted) return;
+    if (!_nativeStarted) {
+      _nativeStarted = true;
+      _cancelLoadingTimeout();
+      if (_isLoading) {
+        _setStateSafely(() => _isLoading = false);
+      }
+    }
     final seconds = progress.inSeconds;
     final durationSeconds = duration.inSeconds;
     final next = seconds.clamp(0, durationSeconds);
@@ -181,6 +189,7 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
       _controller = widget.controller;
       _isUserPaused = false;
       _nativeFailed = false;
+      _nativeStarted = false;
       _hasRecordedView = false;
       _cancelLoadingTimeout();
       if (_controller != null) {
@@ -194,6 +203,7 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
       _descriptionExpanded = false;
       _isUserPaused = false;
       _nativeFailed = false;
+      _nativeStarted = false;
       _hasRecordedView = false;
       _progressSecondsNotifier.value = 0;
       _progressTimer?.cancel();
@@ -314,6 +324,7 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
       return;
     }
 
+    _nativeStarted = false;
     _setStateSafely(() => _isLoading = true);
     _startLoadingTimeout(tryWebFallback: true);
     currentController.removeEventsListener(_onBetterPlayerEvent);
@@ -340,8 +351,8 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
     if (!mounted || _controller != currentController || !reelControllerPool.contains(currentController)) {
       return;
     }
-    _cancelLoadingTimeout();
-    _setStateSafely(() => _isLoading = false);
+    // Keep loading until first real progress event arrives from native player.
+    // If it never arrives, the timeout handler will switch to fallback.
     if (widget.enablePreload) {
       unawaited(_preloadNext());
     }
