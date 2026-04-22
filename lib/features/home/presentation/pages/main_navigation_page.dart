@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_in_app_messaging/firebase_in_app_messaging.dart';
 import 'package:learnify_lms/core/theme/app_text_styles.dart';
@@ -73,9 +74,16 @@ class MainNavigationPageState extends State<MainNavigationPage> {
       _fiamTriggeredOnce = true;
       await Future<void>.delayed(const Duration(seconds: 3));
       if (!mounted) return;
-      await FirebaseAnalytics.instance.logEvent(name: 'home_open');
-      await FirebaseInAppMessaging.instance.triggerEvent('home_open');
-      debugPrint('FIAM trigger sent: home_open');
+      if (Firebase.apps.isEmpty) return;
+
+      try {
+        await FirebaseAnalytics.instance.logEvent(name: 'home_open');
+        await FirebaseInAppMessaging.instance.triggerEvent('home_open');
+        debugPrint('FIAM trigger sent: home_open');
+      } catch (error, stackTrace) {
+        debugPrint('FIAM trigger skipped: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
     });
   }
 

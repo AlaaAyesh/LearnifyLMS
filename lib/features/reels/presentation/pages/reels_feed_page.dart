@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:better_player_plus/better_player_plus.dart';
@@ -77,6 +78,18 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
   int _autoAdvanceAttempts = 0;
   bool _isTransitioningCategory = false;
 
+  void _setStateSafely(VoidCallback fn) {
+    if (!mounted) return;
+    final phase = SchedulerBinding.instance.schedulerPhase;
+    if (phase == SchedulerPhase.persistentCallbacks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(fn);
+      });
+      return;
+    }
+    setState(fn);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -109,12 +122,12 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
         state == AppLifecycleState.hidden) {
       WakelockPlus.disable();
       if (_isPageVisible) {
-        setState(() => _isPageVisible = false);
+        _setStateSafely(() => _isPageVisible = false);
       }
     } else if (state == AppLifecycleState.resumed) {
       WakelockPlus.enable();
       if (widget.isTabActive && !_isPageVisible) {
-        setState(() {
+        _setStateSafely(() {
           _isPageVisible = true;
           _setDarkStatusBar();
         });
@@ -152,7 +165,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
               final bloc = context.read<ReelsBloc>();
               final currentState = bloc.state;
               if (currentState is ReelsWithCategories) {
-                setState(() {
+                _setStateSafely(() {
                   _categories = currentState.categories
                       .where((c) => c.isActive)
                       .toList()
@@ -177,7 +190,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
                   }
                 });
               } else if (currentState is ReelsLoaded && currentState.categories.isNotEmpty) {
-                setState(() {
+                _setStateSafely(() {
                   _categories = currentState.categories
                       .where((c) => c.isActive)
                       .toList()
@@ -212,19 +225,19 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
       } else {
         _setLightStatusBar();
       }
-      setState(() {});
+      _setStateSafely(() {});
     }
   }
 
   @override
   void didPush() {
-    setState(() => _isPageVisible = true);
+    _setStateSafely(() => _isPageVisible = true);
     WakelockPlus.enable();
   }
 
   @override
   void didPopNext() {
-    setState(() {
+    _setStateSafely(() {
       _isPageVisible = true;
       if (widget.isTabActive) {
         _setDarkStatusBar();
@@ -238,14 +251,14 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
 
   @override
   void didPushNext() {
-    setState(() => _isPageVisible = false);
+    _setStateSafely(() => _isPageVisible = false);
     WakelockPlus.disable();
     if (isReelNativePlayerSupported) reelControllerPool.pauseAll();
   }
 
   @override
   void didPop() {
-    setState(() => _isPageVisible = false);
+    _setStateSafely(() => _isPageVisible = false);
     WakelockPlus.disable();
     if (isReelNativePlayerSupported) reelControllerPool.pauseAll();
   }
@@ -271,7 +284,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
   Future<void> _checkAuthentication() async {
     final authLocalDataSource = sl<AuthLocalDataSource>();
     final token = await authLocalDataSource.getAccessToken();
-    setState(() {
+    _setStateSafely(() {
       _isAuthenticated = token != null && token.isNotEmpty;
       _isCheckingAuth = false;
     });
@@ -281,7 +294,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
     final authLocalDataSource = sl<AuthLocalDataSource>();
     final user = await authLocalDataSource.getCachedUser();
 
-    setState(() {
+    _setStateSafely(() {
       _isSubscribed = user?.isSubscribed == true;
     });
   }
@@ -291,7 +304,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
 
   void _handleSubscribe() async {
     debugPrint('ReelsFeedPage: _handleSubscribe called');
-    setState(() => _isPageVisible = false);
+    _setStateSafely(() => _isPageVisible = false);
 
     await Future.delayed(const Duration(milliseconds: 100));
 
@@ -338,7 +351,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
     }
 
     if (mounted) {
-      setState(() {
+      _setStateSafely(() {
         _isPageVisible = true;
         if (widget.isTabActive) {
           _setDarkStatusBar();
@@ -395,7 +408,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
               }
 
               if (state is ReelsWithCategories) {
-                setState(() {
+                _setStateSafely(() {
                   _categories = state.categories
                       .where((c) => c.isActive)
                       .toList()
@@ -419,7 +432,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
               }
 
               if (state is ReelsLoaded && state.categories.isNotEmpty && _categories.isEmpty) {
-                setState(() {
+                _setStateSafely(() {
                   _categories = state.categories
                       .where((c) => c.isActive)
                       .toList()
@@ -446,7 +459,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
                 _shouldResetOnNextLoad = false;
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (mounted && _pageController.hasClients) {
-                    setState(() {
+                    _setStateSafely(() {
                       _currentIndex = 0;
                     });
                     _pageController.jumpToPage(0);
@@ -468,7 +481,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
                 if (isReelNativePlayerSupported) reelControllerPool.disposeAll();
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (mounted) {
-                    setState(() {
+                    _setStateSafely(() {
                       _currentIndex = 0;
                       _playbackIndex = 0;
                     });
@@ -501,7 +514,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
               }
 
               if (state is ReelsEmpty && _isFiltering) {
-                setState(() {
+                _setStateSafely(() {
                   _isFiltering = false;
                   _pageViewResetToken++;
                   _currentIndex = 0;
@@ -510,7 +523,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
               }
 
               if (state is ReelsError && _isFiltering) {
-                setState(() {
+                _setStateSafely(() {
                   _isFiltering = false;
                 });
               }
@@ -643,7 +656,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
                 if (state.categories.isNotEmpty && _categories.isEmpty) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     if (mounted) {
-                      setState(() {
+                      _setStateSafely(() {
                         _categories = state.categories
                             .where((c) => c.isActive)
                             .toList()
@@ -735,7 +748,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
               if (!mounted) return;
 
               if (isSelected) {
-                setState(() {
+                _setStateSafely(() {
                   _selectedCategoryIndex = -1;
                   _isFiltering = true;
                   _activeCategoryId = null;
@@ -769,12 +782,12 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
                   } catch (e) {
                     debugPrint('ReelsFeedPage: Could not load all reels: $e');
                     if (mounted) {
-                      setState(() => _isFiltering = false);
+                      _setStateSafely(() => _isFiltering = false);
                     }
                   }
                 });
               } else {
-                setState(() {
+                _setStateSafely(() {
                   _selectedCategoryIndex = index;
                   _isFiltering = true;
                   _activeCategoryId = category.id;
@@ -808,7 +821,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
                   } catch (e) {
                     debugPrint('ReelsFeedPage: Could not filter by category: $e');
                     if (mounted) {
-                      setState(() => _isFiltering = false);
+                      _setStateSafely(() => _isFiltering = false);
                     }
                   }
                 });
@@ -890,14 +903,14 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
       allowImplicitScrolling: true,
       itemCount: itemCount,
       onPageChanged: (index) {
-        setState(() {
+        _setStateSafely(() {
           _currentIndex = index;
         });
         _pageChangeDebounce?.cancel();
         _pageChangeDebounce = Timer(const Duration(milliseconds: 200), () {
           if (!mounted) return;
           final prevPlayback = _playbackIndex;
-          setState(() => _playbackIndex = index);
+          _setStateSafely(() => _playbackIndex = index);
           if (index > prevPlayback && index - prevPlayback >= 1) {
             reelControllerPool.releaseSlot(0);
           } else if (index < prevPlayback && prevPlayback - index >= 1) {
@@ -1068,7 +1081,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
     _autoAdvanceAttempts++;
     _isTransitioningCategory = true;
 
-    setState(() {
+    _setStateSafely(() {
       _selectedCategoryIndex = nextCategoryIndex;
       _activeCategoryId = nextCategory.id;
       _lastFilteredCategoryId = nextCategory.id;
@@ -1133,7 +1146,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
   }
 
   Future<void> _navigateToUserProfile(ReelOwner owner) async {
-    setState(() => _isPageVisible = false);
+    _setStateSafely(() => _isPageVisible = false);
 
     await Future.delayed(const Duration(milliseconds: 100));
 
@@ -1157,7 +1170,7 @@ class _ReelsFeedPageState extends State<ReelsFeedPage>
     if (!mounted) return;
 
     if (mounted) {
-      setState(() {
+      _setStateSafely(() {
         _isPageVisible = true;
         if (widget.isTabActive) {
           _setDarkStatusBar();

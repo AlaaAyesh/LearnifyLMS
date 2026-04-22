@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../../../../core/constants/app_constants.dart';
@@ -35,9 +36,16 @@ class _SplashPageState extends State<SplashPage>
   }
 
   Future<void> _initPushNotifications() async {
-    await FirebaseMessaging.instance.requestPermission();
-    final token = await FirebaseMessaging.instance.getToken();
-    debugPrint('TOKEN: $token');
+    if (Firebase.apps.isEmpty) return;
+
+    try {
+      await FirebaseMessaging.instance.requestPermission();
+      final token = await FirebaseMessaging.instance.getToken();
+      debugPrint('TOKEN: $token');
+    } catch (error, stackTrace) {
+      debugPrint('Push notifications init skipped: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
   }
 
   void _initAnimation() {

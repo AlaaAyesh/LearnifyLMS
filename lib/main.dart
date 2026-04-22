@@ -11,8 +11,14 @@ import 'core/network/cache_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  await FirebaseInAppMessaging.instance.setAutomaticDataCollectionEnabled(true);
+  try {
+    await Firebase.initializeApp();
+    await FirebaseInAppMessaging.instance
+        .setAutomaticDataCollectionEnabled(true);
+  } catch (error, stackTrace) {
+    debugPrint('Firebase startup skipped: $error');
+    debugPrintStack(stackTrace: stackTrace);
+  }
 
   await Future.wait([
     HiveService.init(),

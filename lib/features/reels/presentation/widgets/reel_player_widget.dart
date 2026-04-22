@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:better_player_plus/better_player_plus.dart';
 import 'package:visibility_detector/visibility_detector.dart';
@@ -60,6 +61,7 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
   bool _isLoading = true;
   bool _showThumbnailOverlay = true;
   bool _isWebInitialized = false;
+  bool _nativeFailed = false;
   bool _isUserPaused = false;
   bool _webIsShowingPausedFrame = false;
   bool _isVisibleEnough = false;
@@ -80,6 +82,18 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
   int? _playerDurationSeconds;
   int? _dragSeekTarget;
 
+  void _setStateSafely(VoidCallback fn) {
+    if (!mounted) return;
+    final phase = SchedulerBinding.instance.schedulerPhase;
+    if (phase == SchedulerPhase.persistentCallbacks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(fn);
+      });
+      return;
+    }
+    setState(fn);
+  }
+
   void _onBetterPlayerEvent(BetterPlayerEvent event) {
     if (event.betterPlayerEventType != BetterPlayerEventType.progress) return;
     final params = event.parameters;
@@ -95,7 +109,7 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
       _progressSecondsNotifier.value = next;
     }
     if (durationSeconds > 0 && _playerDurationSeconds != durationSeconds) {
-      setState(() {
+      _setStateSafely(() {
         _playerDurationSeconds = durationSeconds;
       });
     }
@@ -163,6 +177,7 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
       oldWidget.controller?.removeEventsListener(_onBetterPlayerEvent);
       _controller = widget.controller;
       _isUserPaused = false;
+      _nativeFailed = false;
       _hasRecordedView = false;
       if (_controller != null) {
         _setupCurrent();
@@ -174,6 +189,7 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
         oldWidget.reel.bunnyUrl != widget.reel.bunnyUrl) {
       _descriptionExpanded = false;
       _isUserPaused = false;
+      _nativeFailed = false;
       _hasRecordedView = false;
       _progressSecondsNotifier.value = 0;
       _progressTimer?.cancel();
@@ -189,7 +205,7 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
         (widget.isActive || widget.shouldPreload) &&
         !_isWebInitialized &&
         !_isDirectStreamUrl(widget.reel.bunnyUrl);
-    if (shouldInit && _controller == null) {
+    if (shouldInit && (_controller == null || _nativeFailed)) {
       _initializeWebPlayer();
     }
 
@@ -234,6 +250,9 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
     _progressTimer?.cancel();
     _controller?.removeEventsListener(_onBetterPlayerEvent);
     _progressSecondsNotifier.dispose();
+    // Don't dispose the BetterPlayerController here.
+    // It may be shared (pooled) and BetterPlayer widget might already be unmounting.
+    // Controller lifecycle is managed by ReelControllerPool.
     if (_webController != null) {
       _webController!.runJavaScript('''
         var iframe = document.getElementById('bunny-player');
@@ -248,17 +267,37 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
     if (_controller == null) return;
     if (widget.reel.bunnyUrl.isEmpty) return;
 
-    setState(() => _isLoading = true);
-    _controller!.removeEventsListener(_onBetterPlayerEvent);
-    _controller!.addEventsListener(_onBetterPlayerEvent);
-    await reelControllerPool.setDataSource(
-      _controller!,
-      url: widget.reel.bunnyUrl,
-      tryHlsFirst: true,
-    );
+    final currentController = _controller;
+    if (currentController == null || !reelControllerPool.contains(currentController)) {
+      return;
+    }
 
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+    _setStateSafely(() => _isLoading = true);
+    currentController.removeEventsListener(_onBetterPlayerEvent);
+    currentController.addEventsListener(_onBetterPlayerEvent);
+    try {
+      final ok = await reelControllerPool.setDataSource(
+        currentController,
+        url: widget.reel.bunnyUrl,
+        tryHlsFirst: true,
+      );
+      if (!ok) {
+        _nativeFailed = true;
+        // Fall back to WebView embed for non-direct Bunny URLs (especially on iOS).
+        if (!_isDirectStreamUrl(widget.reel.bunnyUrl)) {
+          _initializeWebPlayer();
+        }
+        return;
+      }
+    } catch (e) {
+      debugPrint('ReelPlayerWidget: setDataSource skipped after dispose: $e');
+      return;
+    }
+
+    if (!mounted || _controller != currentController || !reelControllerPool.contains(currentController)) {
+      return;
+    }
+    _setStateSafely(() => _isLoading = false);
     if (widget.enablePreload) {
       unawaited(_preloadNext());
     }
@@ -334,9 +373,9 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
             NavigationDelegate(
               onPageFinished: (_) {
                 if (mounted) {
-                  setState(() => _isLoading = false);
+                  _setStateSafely(() => _isLoading = false);
                   Future.delayed(const Duration(milliseconds: 800), () {
-                    if (mounted) setState(() => _showThumbnailOverlay = false);
+                    if (mounted) _setStateSafely(() => _showThumbnailOverlay = false);
                   });
                 }
               },
@@ -350,7 +389,7 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
     if (platform is AndroidWebViewController) {
       platform.setMediaPlaybackRequiresUserGesture(false);
     }
-    if (mounted) setState(() {});
+    if (mounted) _setStateSafely(() {});
   }
 
   void _playVideoWeb() {
@@ -428,7 +467,13 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
   void _playVideo() {
     if (!_shouldPlayNow) return;
     if (_controller != null) {
-      _controller!.play();
+      try {
+        if (reelControllerPool.contains(_controller!)) {
+          _controller!.play();
+        }
+      } catch (e) {
+        debugPrint('ReelPlayerWidget: play skipped after dispose: $e');
+      }
       _startViewTimer();
     } else if (_webController != null) {
       _playVideoWeb();
@@ -461,7 +506,7 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
       _pauseVideo();
       _cancelViewTimer();
     }
-    setState(() {});
+    _setStateSafely(() {});
   }
 
   void _handleTap() {
@@ -524,6 +569,7 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
     final controller = _controller;
     if (controller == null || !mounted) return;
     try {
+      if (!reelControllerPool.contains(controller)) return;
       await controller.seekTo(Duration(seconds: targetSeconds));
       if (!mounted) return;
       if (_shouldPlayNow) {
@@ -535,10 +581,10 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
   }
 
   void _showLikeAnimation() {
-    setState(() => _showLikeHeart = true);
+    _setStateSafely(() => _showLikeHeart = true);
     Future.delayed(const Duration(milliseconds: 800), () {
       if (mounted) {
-        setState(() => _showLikeHeart = false);
+        _setStateSafely(() => _showLikeHeart = false);
       }
     });
   }
@@ -574,7 +620,7 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
     }
 
     return GestureDetector(
-      onTap: () => setState(() => _descriptionExpanded = true),
+      onTap: () => _setStateSafely(() => _descriptionExpanded = true),
       child: ConstrainedBox(
         constraints: constraints,
         child: Row(
