@@ -716,7 +716,9 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
         _syncPlaybackState();
       },
       child: GestureDetector(
-        onTap: _handleTap,
+        // In WebView fallback on iOS, let WebView receive taps
+        // so user can start playback if autoplay is blocked.
+        onTap: _controller != null ? _handleTap : null,
         behavior: HitTestBehavior.translucent,
         child: Stack(
           fit: StackFit.expand,
@@ -724,7 +726,7 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
             if (_controller != null && widget.reel.bunnyUrl.isNotEmpty)
               BetterPlayer(controller: _controller!)
             else if (_webController != null && widget.reel.bunnyUrl.isNotEmpty && !_showThumbnailOverlay)
-              AbsorbPointer(child: WebViewWidget(controller: _webController!))
+              WebViewWidget(controller: _webController!)
             else
               _buildThumbnail(context),
 
