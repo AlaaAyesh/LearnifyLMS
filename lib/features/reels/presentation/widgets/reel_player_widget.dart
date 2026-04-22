@@ -72,6 +72,9 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
   bool _hasRecordedView = false;
   static const _viewDuration = Duration(seconds: 3);
 
+  Timer? _loadingTimeoutTimer;
+  static const _loadingTimeout = Duration(seconds: 10);
+
   DateTime? _lastTapTime;
   static const _doubleTapDuration = Duration(milliseconds: 300);
 
@@ -179,6 +182,7 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
       _isUserPaused = false;
       _nativeFailed = false;
       _hasRecordedView = false;
+      _cancelLoadingTimeout();
       if (_controller != null) {
         _setupCurrent();
       } else if (widget.reel.bunnyUrl.isNotEmpty && widget.isActive && !_isDirectStreamUrl(widget.reel.bunnyUrl)) {
@@ -193,6 +197,8 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
       _hasRecordedView = false;
       _progressSecondsNotifier.value = 0;
       _progressTimer?.cancel();
+      _cancelLoadingTimeout();
+      _resetWebController();
       _controller?.removeEventsListener(_onBetterPlayerEvent);
       if (_controller != null) {
         _setupCurrent();
@@ -248,6 +254,7 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
     WidgetsBinding.instance.removeObserver(this);
     _cancelViewTimer();
     _progressTimer?.cancel();
+    _cancelLoadingTimeout();
     _controller?.removeEventsListener(_onBetterPlayerEvent);
     _progressSecondsNotifier.dispose();
     // Don't dispose the BetterPlayerController here.
@@ -263,6 +270,41 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
     super.dispose();
   }
 
+  void _cancelLoadingTimeout() {
+    _loadingTimeoutTimer?.cancel();
+    _loadingTimeoutTimer = null;
+  }
+
+  void _startLoadingTimeout({required bool tryWebFallback}) {
+    _cancelLoadingTimeout();
+    _loadingTimeoutTimer = Timer(_loadingTimeout, () {
+      if (!mounted) return;
+      // If we are still loading after timeout, try a safer fallback.
+      if (_isLoading && widget.isActive) {
+        debugPrint('ReelPlayerWidget: loading timeout, switching fallback');
+        _setStateSafely(() => _isLoading = false);
+        if (tryWebFallback && !_isDirectStreamUrl(widget.reel.bunnyUrl)) {
+          _nativeFailed = true;
+          _initializeWebPlayer();
+        }
+      }
+    });
+  }
+
+  void _resetWebController() {
+    if (_webController != null) {
+      try {
+        _webController!.runJavaScript('''
+          var iframe = document.getElementById('bunny-player');
+          if (iframe) { iframe.src = "about:blank"; }
+        ''');
+      } catch (_) {}
+    }
+    _webController = null;
+    _isWebInitialized = false;
+    _showThumbnailOverlay = true;
+  }
+
   Future<void> _setupCurrent() async {
     if (_controller == null) return;
     if (widget.reel.bunnyUrl.isEmpty) return;
@@ -273,6 +315,7 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
     }
 
     _setStateSafely(() => _isLoading = true);
+    _startLoadingTimeout(tryWebFallback: true);
     currentController.removeEventsListener(_onBetterPlayerEvent);
     currentController.addEventsListener(_onBetterPlayerEvent);
     try {
@@ -297,6 +340,7 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
     if (!mounted || _controller != currentController || !reelControllerPool.contains(currentController)) {
       return;
     }
+    _cancelLoadingTimeout();
     _setStateSafely(() => _isLoading = false);
     if (widget.enablePreload) {
       unawaited(_preloadNext());
@@ -304,11 +348,13 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
     _syncPlaybackState();
   }
 
-  String _getEmbedUrl(String url, {bool autoplay = true, int startSeconds = 0}) {
+  String _getEmbedUrl(String url, {required bool autoplay, int startSeconds = 0}) {
     String embedUrl = url.replaceFirst('/play/', '/embed/');
     final safeStart = startSeconds < 0 ? 0 : startSeconds;
+    // iOS often blocks autoplay with audio. Start muted for reliable autoplay.
+    final muted = autoplay ? 'true' : 'false';
     final params =
-        'autoplay=$autoplay&loop=true&muted=false&preload=true&responsive=true&controls=false&t=$safeStart';
+        'autoplay=$autoplay&loop=true&muted=$muted&preload=true&responsive=true&controls=false&t=$safeStart';
     if (!embedUrl.contains('?')) {
       embedUrl = '$embedUrl?$params';
     } else {
@@ -373,6 +419,7 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
             NavigationDelegate(
               onPageFinished: (_) {
                 if (mounted) {
+                  _cancelLoadingTimeout();
                   _setStateSafely(() => _isLoading = false);
                   Future.delayed(const Duration(milliseconds: 800), () {
                     if (mounted) _setStateSafely(() => _showThumbnailOverlay = false);
@@ -389,6 +436,7 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
     if (platform is AndroidWebViewController) {
       platform.setMediaPlaybackRequiresUserGesture(false);
     }
+    _startLoadingTimeout(tryWebFallback: false);
     if (mounted) _setStateSafely(() {});
   }
 
