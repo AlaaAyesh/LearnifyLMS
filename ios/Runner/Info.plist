@@ -51,6 +51,8 @@
 		<true/>
 		<key>NSAllowsArbitraryLoadsInWebContent</key>
 		<true/>
+		<key>NSAllowsArbitraryLoadsInMedia</key>
+		<true/>
 	</dict>
 </dict>
 </plist>

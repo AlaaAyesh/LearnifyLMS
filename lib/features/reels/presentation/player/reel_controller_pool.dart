@@ -44,7 +44,7 @@ class ReelControllerPool {
         autoPlay: false,
         autoDispose: false,
         looping: true,
-        handleLifecycle: true,
+        handleLifecycle: false,
         allowedScreenSleep: false,
         autoDetectFullscreenDeviceOrientation: true,
         aspectRatio: 9 / 16,
@@ -94,12 +94,10 @@ class ReelControllerPool {
     return defaultTargetPlatform == TargetPlatform.iOS;
   }
 
-  /// Hybrid reels loading (no WebView): **iOS** prefers progressive (`other`);
-  /// **Android** (and other non‑iOS) prefers **HLS** from [toBunnyHlsUrl].
-  /// Falls back to the alternate strategy if the primary load fails.
+  /// Reels: **HLS** (`playlist.m3u8` via [toBunnyHlsUrl]) — same stream Safari/AVPlayer uses.
+  /// On **iOS**, after load: `setVolume(0)` → short delay → `play()` so autoplay actually starts.
   ///
-  /// [forceStart]: when true, mutes on iOS then calls [play]. When false (preload),
-  /// only binds the source; use [warmUp] to buffer.
+  /// [forceStart]: when false (preload), only attaches the source; use [warmUp] to buffer.
   Future<bool> setDataSource(
     BetterPlayerController controller, {
     required String url,
@@ -124,52 +122,35 @@ class ReelControllerPool {
       await controller.setupDataSource(dataSource);
     }
 
-    Future<bool> bindPrimary() async {
-      if (_isIosLikeReelsTarget()) {
-        await tryLoad(trimmed, BetterPlayerVideoFormat.other);
-      } else {
-        final hlsUrl = toBunnyHlsUrl(trimmed);
-        await tryLoad(hlsUrl, BetterPlayerVideoFormat.hls);
-      }
-      return true;
-    }
-
-    Future<bool> bindFallback() async {
-      if (_isIosLikeReelsTarget()) {
-        final hlsUrl = toBunnyHlsUrl(trimmed);
-        await tryLoad(hlsUrl, BetterPlayerVideoFormat.hls);
-      } else {
-        await tryLoad(trimmed, BetterPlayerVideoFormat.other);
-      }
-      return true;
-    }
-
-    Future<void> maybeForceStart() async {
+    Future<void> forceStartPlayback() async {
       if (!forceStart) return;
       if (_isIosLikeReelsTarget()) {
         try {
           await controller.setVolume(0);
         } catch (_) {}
+        await Future<void>.delayed(const Duration(milliseconds: 100));
       }
       try {
         await controller.play();
       } catch (_) {}
     }
 
+    final hlsUrl = toBunnyHlsUrl(trimmed);
+
     try {
-      await bindPrimary();
-      await maybeForceStart();
+      await tryLoad(hlsUrl, BetterPlayerVideoFormat.hls);
+      await forceStartPlayback();
       return true;
     } catch (e) {
-      debugPrint('Reel primary load failed: $e');
+      debugPrint('Reel HLS load failed: $e');
     }
 
     try {
-      await bindFallback();
-      await maybeForceStart();
+      await tryLoad(trimmed, BetterPlayerVideoFormat.other);
+      await forceStartPlayback();
       return true;
     } catch (e) {
-      debugPrint('Reel fallback load failed: $e');
+      debugPrint('Reel progressive fallback failed: $e');
     }
 
     return false;
