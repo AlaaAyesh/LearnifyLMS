@@ -9,7 +9,7 @@
     "path": "ios",
     "scheme": "",
     "signing": false,
-    "configuration": "Debug"
+    "configuration": "Release"
   },
   "flutter": {
     "version": "3.41.3"
