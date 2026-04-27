@@ -5,8 +5,9 @@ on:
     inputs:
       build_id:
         description: 'Unique build identifier'
-        required: true
+        required: false
         type: string
+        default: ''
       ios_path:
         description: 'Path to iOS project (e.g., "ios" for React Native)'
         required: false
@@ -26,7 +27,7 @@ on:
         description: 'Build configuration (Debug is faster, Release for production)'
         required: false
         type: string
-        default: 'Debug'
+        default: 'Release'
       flutter_version:
         description: 'Flutter version to use (e.g., 3.24.0). Empty means latest stable.'
         required: false
@@ -157,6 +158,11 @@ jobs:
           CONFIGURATION: ${{ inputs.configuration }}
         run: |
           set -e
+
+          if [ -z "$BUILD_ID" ]; then
+            BUILD_ID="ios-build-${GITHUB_RUN_NUMBER}"
+          fi
+          echo "Using BUILD_ID=$BUILD_ID"
 
           # Navigate to iOS project
           cd "$IOS_PATH"
@@ -334,10 +340,14 @@ jobs:
         env:
           USE_SIGNING: ${{ inputs.use_signing }}
           CONFIGURATION: ${{ inputs.configuration }}
+          BUILD_ID: ${{ inputs.build_id }}
         run: |
+          if [ -z "$BUILD_ID" ]; then
+            BUILD_ID="ios-build-${GITHUB_RUN_NUMBER}"
+          fi
           echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Build ID:** ${{ inputs.build_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build ID:** $BUILD_ID" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Configuration:** $CONFIGURATION" >> $GITHUB_STEP_SUMMARY
           echo "- **DerivedData Cache:** ${{ steps.cache-deriveddata.outputs.cache-hit == 'true' && 'Hit' || 'Miss' }}" >> $GITHUB_STEP_SUMMARY
@@ -348,7 +358,7 @@ jobs:
           else
             echo "- **Signing:** Unsigned (sign locally with AltStore/Sideloadly)" >> $GITHUB_STEP_SUMMARY
           fi
-          if [ -f build/*.ipa ]; then
-            IPA_PATH=$(find build -name "*.ipa" -type f | head -1)
+          IPA_PATH=$(find build -name "*.ipa" -type f | head -1 || true)
+          if [ -n "$IPA_PATH" ]; then
             echo "- **IPA Size:** $(ls -lh "$IPA_PATH" | awk '{print $5}')" >> $GITHUB_STEP_SUMMARY
           fi
