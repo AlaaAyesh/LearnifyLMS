@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -361,8 +362,8 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
   String _getEmbedUrl(String url, {required bool autoplay, int startSeconds = 0}) {
     String embedUrl = url.replaceFirst('/play/', '/embed/');
     final safeStart = startSeconds < 0 ? 0 : startSeconds;
-    // iOS often blocks autoplay with audio. Start muted for reliable autoplay.
-    final muted = autoplay ? 'true' : 'false';
+    // iOS blocks unmuted autoplay in embedded players; keep muted always.
+    final muted = 'true';
     final params =
         'autoplay=$autoplay&loop=true&muted=$muted&preload=true&responsive=true&controls=false&t=$safeStart';
     if (!embedUrl.contains('?')) {
@@ -374,6 +375,8 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
   }
 
   void _initializeWebPlayer() {
+    // WebView + iframe reload is unreliable on iOS; reels use native BetterPlayer only.
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) return;
     if (_isWebInitialized || widget.reel.bunnyUrl.isEmpty) return;
     _isWebInitialized = true;
     final autoplay = widget.isActive;
@@ -552,7 +555,15 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
   }
 
   void _togglePlayPause() {
+    final wasPaused = _isUserPaused;
     _isUserPaused = !_isUserPaused;
+    if (!kIsWeb &&
+        defaultTargetPlatform == TargetPlatform.iOS &&
+        _controller != null &&
+        wasPaused &&
+        !_isUserPaused) {
+      unawaited(_controller!.setVolume(1.0));
+    }
     _syncPlaybackState();
   }
 
@@ -726,9 +737,7 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
         _syncPlaybackState();
       },
       child: GestureDetector(
-        // In WebView fallback on iOS, let WebView receive taps
-        // so user can start playback if autoplay is blocked.
-        onTap: _controller != null ? _handleTap : null,
+        onTap: _handleTap,
         behavior: HitTestBehavior.translucent,
         child: Stack(
           fit: StackFit.expand,

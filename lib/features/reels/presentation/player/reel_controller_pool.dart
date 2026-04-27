@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:better_player_plus/better_player_plus.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
@@ -87,6 +88,14 @@ class ReelControllerPool {
     return _controllers.contains(controller);
   }
 
+  static Future<void> _applyIosReelAutoplayMute(BetterPlayerController controller) async {
+    if (kIsWeb) return;
+    if (defaultTargetPlatform != TargetPlatform.iOS) return;
+    try {
+      await controller.setVolume(0);
+    } catch (_) {}
+  }
+
   Future<bool> setDataSource(
     BetterPlayerController controller, {
     required String url,
@@ -98,7 +107,8 @@ class ReelControllerPool {
       controller.pause();
     } catch (_) {}
 
-    final hlsUrl = toBunnyHlsUrl(url);
+    final trimmed = url.trim();
+    final hlsUrl = toBunnyHlsUrl(trimmed);
 
     Future<void> tryLoad(String loadUrl, BetterPlayerVideoFormat format) async {
       final dataSource = BetterPlayerDataSource(
@@ -111,12 +121,44 @@ class ReelControllerPool {
       await controller.setupDataSource(dataSource);
     }
 
-    try {
-      await tryLoad(hlsUrl, BetterPlayerVideoFormat.hls);
-      return true;
-    } catch (e) {
-      debugPrint('HLS failed: $e');
+    if (tryHlsFirst) {
+      try {
+        await tryLoad(hlsUrl, BetterPlayerVideoFormat.hls);
+        await _applyIosReelAutoplayMute(controller);
+        return true;
+      } catch (e) {
+        debugPrint('Reel HLS failed: $e');
+      }
     }
+
+    if (hlsUrl != trimmed) {
+      try {
+        await tryLoad(trimmed, BetterPlayerVideoFormat.other);
+        await _applyIosReelAutoplayMute(controller);
+        return true;
+      } catch (e) {
+        debugPrint('Reel original URL (progressive) failed: $e');
+      }
+    }
+
+    if (hlsUrl == trimmed) {
+      try {
+        await tryLoad(trimmed, BetterPlayerVideoFormat.other);
+        await _applyIosReelAutoplayMute(controller);
+        return true;
+      } catch (e) {
+        debugPrint('Reel same-URL other format failed: $e');
+      }
+    } else {
+      try {
+        await tryLoad(hlsUrl, BetterPlayerVideoFormat.other);
+        await _applyIosReelAutoplayMute(controller);
+        return true;
+      } catch (e) {
+        debugPrint('Reel HLS URL as progressive failed: $e');
+      }
+    }
+
     return false;
   }
 
