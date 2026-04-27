@@ -40,10 +40,11 @@ class ReelControllerPool {
   BetterPlayerController _createController() {
     return BetterPlayerController(
       BetterPlayerConfiguration(
-        autoPlay: false,
+        autoPlay: true,
         autoDispose: false,
         looping: true,
-        handleLifecycle: false,
+        handleLifecycle: true,
+        allowedScreenSleep: false,
         autoDetectFullscreenDeviceOrientation: true,
         aspectRatio: 9 / 16,
         fit: BoxFit.cover,
@@ -110,31 +111,11 @@ class ReelControllerPool {
       await controller.setupDataSource(dataSource);
     }
 
-    final lower = url.trim().toLowerCase();
-    final bool isHls = lower.contains('.m3u8');
-    final bool isMp4 = lower.contains('.mp4');
-
     try {
-      if (isHls) {
-        await tryLoad(url, BetterPlayerVideoFormat.hls);
-      } else if (isMp4) {
-        await tryLoad(url, BetterPlayerVideoFormat.other);
-      } else if (tryHlsFirst && hlsUrl != url) {
-        await tryLoad(hlsUrl, BetterPlayerVideoFormat.hls);
-      } else {
-        await tryLoad(url, BetterPlayerVideoFormat.other);
-      }
+      await tryLoad(hlsUrl, BetterPlayerVideoFormat.hls);
       return true;
     } catch (e) {
-      debugPrint('ReelControllerPool.setDataSource error: $e');
-      if (!isHls && !isMp4 && tryHlsFirst && hlsUrl != url) {
-        try {
-          await tryLoad(url, BetterPlayerVideoFormat.other);
-          return true;
-        } catch (e2) {
-          debugPrint('ReelControllerPool.setDataSource fallback error: $e2');
-        }
-      }
+      debugPrint('HLS failed: $e');
     }
     return false;
   }

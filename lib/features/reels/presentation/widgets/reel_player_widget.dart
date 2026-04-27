@@ -158,8 +158,9 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
         (widget.isActive || widget.shouldPreload);
     if (_controller != null) {
       _setupCurrent();
-    } else if (shouldInit && !_isDirectStreamUrl(widget.reel.bunnyUrl)) {
-      _initializeWebPlayer();
+    } else if (shouldInit) {
+      _nativeFailed = true;
+      _setStateSafely(() => _isLoading = false);
     }
   }
 
@@ -194,8 +195,9 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
       _cancelLoadingTimeout();
       if (_controller != null) {
         _setupCurrent();
-      } else if (widget.reel.bunnyUrl.isNotEmpty && widget.isActive && !_isDirectStreamUrl(widget.reel.bunnyUrl)) {
-        _initializeWebPlayer();
+      } else if (widget.reel.bunnyUrl.isNotEmpty && widget.isActive) {
+        _nativeFailed = true;
+        _setStateSafely(() => _isLoading = false);
       }
     }
     if (oldWidget.reel.id != widget.reel.id ||
@@ -212,17 +214,17 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
       _controller?.removeEventsListener(_onBetterPlayerEvent);
       if (_controller != null) {
         _setupCurrent();
-      } else if (widget.reel.bunnyUrl.isNotEmpty && (widget.isActive || widget.shouldPreload) && !_isWebInitialized && !_isDirectStreamUrl(widget.reel.bunnyUrl)) {
-        _initializeWebPlayer();
+      } else if (widget.reel.bunnyUrl.isNotEmpty && (widget.isActive || widget.shouldPreload)) {
+        _nativeFailed = true;
+        _setStateSafely(() => _isLoading = false);
       }
     }
 
     final shouldInit = widget.reel.bunnyUrl.isNotEmpty &&
-        (widget.isActive || widget.shouldPreload) &&
-        !_isWebInitialized &&
-        !_isDirectStreamUrl(widget.reel.bunnyUrl);
-    if (shouldInit && (_controller == null || _nativeFailed)) {
-      _initializeWebPlayer();
+        (widget.isActive || widget.shouldPreload);
+    if (shouldInit && _controller == null) {
+      _nativeFailed = true;
+      _setStateSafely(() => _isLoading = false);
     }
 
     if (!widget.isActive) {
@@ -293,10 +295,7 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
       if (_isLoading && widget.isActive) {
         debugPrint('ReelPlayerWidget: loading timeout, switching fallback');
         _setStateSafely(() => _isLoading = false);
-        if (tryWebFallback && !_isDirectStreamUrl(widget.reel.bunnyUrl)) {
-          _nativeFailed = true;
-          _initializeWebPlayer();
-        }
+        _nativeFailed = true;
       }
     });
   }
@@ -324,9 +323,12 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
       return;
     }
 
+    debugPrint("VIDEO URL: ${widget.reel.bunnyUrl}");
+    debugPrint("HLS URL: ${ReelControllerPool.toBunnyHlsUrl(widget.reel.bunnyUrl)}");
+
     _nativeStarted = false;
     _setStateSafely(() => _isLoading = true);
-    _startLoadingTimeout(tryWebFallback: true);
+    _startLoadingTimeout(tryWebFallback: false);
     currentController.removeEventsListener(_onBetterPlayerEvent);
     currentController.addEventsListener(_onBetterPlayerEvent);
     try {
@@ -337,10 +339,7 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
       );
       if (!ok) {
         _nativeFailed = true;
-        // Fall back to WebView embed for non-direct Bunny URLs (especially on iOS).
-        if (!_isDirectStreamUrl(widget.reel.bunnyUrl)) {
-          _initializeWebPlayer();
-        }
+        _setStateSafely(() => _isLoading = false);
         return;
       }
     } catch (e) {
@@ -736,8 +735,6 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
           children: [
             if (_controller != null && widget.reel.bunnyUrl.isNotEmpty)
               BetterPlayer(controller: _controller!)
-            else if (_webController != null && widget.reel.bunnyUrl.isNotEmpty && !_showThumbnailOverlay)
-              WebViewWidget(controller: _webController!)
             else
               _buildThumbnail(context),
 
