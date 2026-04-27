@@ -5,10 +5,6 @@ import 'package:flutter/scheduler.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:better_player_plus/better_player_plus.dart';
 import 'package:visibility_detector/visibility_detector.dart';
-import 'package:webview_flutter/webview_flutter.dart';
-import 'package:webview_flutter_android/webview_flutter_android.dart';
-import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
-import 'package:webview_flutter_platform_interface/webview_flutter_platform_interface.dart';
 import '../../../../core/utils/responsive.dart';
 import '../../domain/entities/reel.dart';
 import '../player/reel_constants.dart';
@@ -58,14 +54,9 @@ class ReelPlayerWidget extends StatefulWidget {
 class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
     with WidgetsBindingObserver {
   BetterPlayerController? _controller;
-  WebViewController? _webController;
   bool _isLoading = true;
-  bool _showThumbnailOverlay = true;
-  bool _isWebInitialized = false;
-  bool _nativeFailed = false;
   bool _nativeStarted = false;
   bool _isUserPaused = false;
-  bool _webIsShowingPausedFrame = false;
   bool _isVisibleEnough = false;
   bool _showLikeHeart = false;
   bool _wasPlayingBeforeBackground = false;
@@ -160,13 +151,9 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
     if (_controller != null) {
       _setupCurrent();
     } else if (shouldInit) {
-      _nativeFailed = true;
       _setStateSafely(() => _isLoading = false);
     }
   }
-
-  static bool _isDirectStreamUrl(String url) =>
-      ReelControllerPool.isDirectStreamUrl(url);
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -190,14 +177,12 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
       oldWidget.controller?.removeEventsListener(_onBetterPlayerEvent);
       _controller = widget.controller;
       _isUserPaused = false;
-      _nativeFailed = false;
       _nativeStarted = false;
       _hasRecordedView = false;
       _cancelLoadingTimeout();
       if (_controller != null) {
         _setupCurrent();
       } else if (widget.reel.bunnyUrl.isNotEmpty && widget.isActive) {
-        _nativeFailed = true;
         _setStateSafely(() => _isLoading = false);
       }
     }
@@ -205,18 +190,15 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
         oldWidget.reel.bunnyUrl != widget.reel.bunnyUrl) {
       _descriptionExpanded = false;
       _isUserPaused = false;
-      _nativeFailed = false;
       _nativeStarted = false;
       _hasRecordedView = false;
       _progressSecondsNotifier.value = 0;
       _progressTimer?.cancel();
       _cancelLoadingTimeout();
-      _resetWebController();
       _controller?.removeEventsListener(_onBetterPlayerEvent);
       if (_controller != null) {
         _setupCurrent();
       } else if (widget.reel.bunnyUrl.isNotEmpty && (widget.isActive || widget.shouldPreload)) {
-        _nativeFailed = true;
         _setStateSafely(() => _isLoading = false);
       }
     }
@@ -224,7 +206,6 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
     final shouldInit = widget.reel.bunnyUrl.isNotEmpty &&
         (widget.isActive || widget.shouldPreload);
     if (shouldInit && _controller == null) {
-      _nativeFailed = true;
       _setStateSafely(() => _isLoading = false);
     }
 
@@ -244,21 +225,8 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
 
   void _startOrStopProgressTimer() {
     _progressTimer?.cancel();
-    
-    final useNative = _controller != null;
-    final useWeb = _webController != null;
-    
-    if (!_shouldPlayNow || (!useNative && !useWeb)) {
+    if (!_shouldPlayNow || _controller == null) {
       return;
-    }
-    
-    if (useWeb) {
-      _progressTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-        if (!mounted) return;
-        if (!_shouldPlayNow) return;
-        final next = (_progressSecondsNotifier.value + 1).clamp(0, _durationSeconds);
-        _progressSecondsNotifier.value = next;
-      });
     }
   }
 
@@ -273,13 +241,6 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
     // Don't dispose the BetterPlayerController here.
     // It may be shared (pooled) and BetterPlayer widget might already be unmounting.
     // Controller lifecycle is managed by ReelControllerPool.
-    if (_webController != null) {
-      _webController!.runJavaScript('''
-        var iframe = document.getElementById('bunny-player');
-        if (iframe) { iframe.src = "about:blank"; }
-      ''');
-      _webController = null;
-    }
     super.dispose();
   }
 
@@ -288,31 +249,15 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
     _loadingTimeoutTimer = null;
   }
 
-  void _startLoadingTimeout({required bool tryWebFallback}) {
+  void _startLoadingTimeout() {
     _cancelLoadingTimeout();
     _loadingTimeoutTimer = Timer(_loadingTimeout, () {
       if (!mounted) return;
-      // If we are still loading after timeout, try a safer fallback.
       if (_isLoading && widget.isActive) {
-        debugPrint('ReelPlayerWidget: loading timeout, switching fallback');
+        debugPrint('ReelPlayerWidget: loading timeout');
         _setStateSafely(() => _isLoading = false);
-        _nativeFailed = true;
       }
     });
-  }
-
-  void _resetWebController() {
-    if (_webController != null) {
-      try {
-        _webController!.runJavaScript('''
-          var iframe = document.getElementById('bunny-player');
-          if (iframe) { iframe.src = "about:blank"; }
-        ''');
-      } catch (_) {}
-    }
-    _webController = null;
-    _isWebInitialized = false;
-    _showThumbnailOverlay = true;
   }
 
   Future<void> _setupCurrent() async {
@@ -324,22 +269,19 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
       return;
     }
 
-    debugPrint("VIDEO URL: ${widget.reel.bunnyUrl}");
-    debugPrint("HLS URL: ${ReelControllerPool.toBunnyHlsUrl(widget.reel.bunnyUrl)}");
+    debugPrint('Reel VIDEO URL: ${widget.reel.bunnyUrl}');
 
     _nativeStarted = false;
     _setStateSafely(() => _isLoading = true);
-    _startLoadingTimeout(tryWebFallback: false);
+    _startLoadingTimeout();
     currentController.removeEventsListener(_onBetterPlayerEvent);
     currentController.addEventsListener(_onBetterPlayerEvent);
     try {
       final ok = await reelControllerPool.setDataSource(
         currentController,
         url: widget.reel.bunnyUrl,
-        tryHlsFirst: true,
       );
       if (!ok) {
-        _nativeFailed = true;
         _setStateSafely(() => _isLoading = false);
         return;
       }
@@ -359,142 +301,6 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
     _syncPlaybackState();
   }
 
-  String _getEmbedUrl(String url, {required bool autoplay, int startSeconds = 0}) {
-    String embedUrl = url.replaceFirst('/play/', '/embed/');
-    final safeStart = startSeconds < 0 ? 0 : startSeconds;
-    // iOS blocks unmuted autoplay in embedded players; keep muted always.
-    final muted = 'true';
-    final params =
-        'autoplay=$autoplay&loop=true&muted=$muted&preload=true&responsive=true&controls=false&t=$safeStart';
-    if (!embedUrl.contains('?')) {
-      embedUrl = '$embedUrl?$params';
-    } else {
-      embedUrl = '$embedUrl&$params';
-    }
-    return embedUrl;
-  }
-
-  void _initializeWebPlayer() {
-    // WebView + iframe reload is unreliable on iOS; reels use native BetterPlayer only.
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) return;
-    if (_isWebInitialized || widget.reel.bunnyUrl.isEmpty) return;
-    _isWebInitialized = true;
-    final autoplay = widget.isActive;
-    _webIsShowingPausedFrame = !autoplay;
-    final embedUrl = _getEmbedUrl(
-      widget.reel.bunnyUrl,
-      autoplay: autoplay,
-      startSeconds: 0,
-    );
-    final html = '''
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
-    .video-container { position: relative; width: 100%; height: 100%; overflow: hidden; }
-    iframe {
-      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      width: 100%; height: calc(100% + 100px); border: 0; object-fit: cover; margin-bottom: -50px;
-    }
-    .controls-cover { position: absolute; bottom: 0; left: 0; right: 0; height: 60px; background: #000; z-index: 9999; }
-  </style>
-</head>
-<body>
-  <div class="video-container">
-    <iframe id="bunny-player" src="$embedUrl" loading="eager"
-      allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen"
-      allowfullscreen="true" playsinline webkit-playsinline>
-    </iframe>
-    <div class="controls-cover"></div>
-  </div>
-</body>
-</html>
-''';
-    late final PlatformWebViewControllerCreationParams params;
-    if (WebViewPlatform.instance is WebKitWebViewPlatform) {
-      params = WebKitWebViewControllerCreationParams(
-        allowsInlineMediaPlayback: true,
-        mediaTypesRequiringUserAction: const <PlaybackMediaTypes>{},
-      );
-    } else {
-      params = const PlatformWebViewControllerCreationParams();
-    }
-
-    final WebViewController controller =
-        WebViewController.fromPlatformCreationParams(params)
-          ..setJavaScriptMode(JavaScriptMode.unrestricted)
-          ..setBackgroundColor(Colors.black)
-          ..setNavigationDelegate(
-            NavigationDelegate(
-              onPageFinished: (_) {
-                if (mounted) {
-                  _cancelLoadingTimeout();
-                  _setStateSafely(() => _isLoading = false);
-                  Future.delayed(const Duration(milliseconds: 800), () {
-                    if (mounted) _setStateSafely(() => _showThumbnailOverlay = false);
-                  });
-                }
-              },
-            ),
-          )
-          ..loadHtmlString(html);
-
-    _webController = controller;
-
-    final platform = _webController!.platform;
-    if (platform is AndroidWebViewController) {
-      platform.setMediaPlaybackRequiresUserGesture(false);
-    }
-    _startLoadingTimeout(tryWebFallback: false);
-    if (mounted) _setStateSafely(() {});
-  }
-
-  void _playVideoWeb() {
-    if (_webController == null) return;
-    if (!_webIsShowingPausedFrame) return;
-
-    var start = _progressSecondsNotifier.value < 0 ? 0 : _progressSecondsNotifier.value;
-    if (_durationSeconds > 0 && start >= _durationSeconds) {
-      start = (_durationSeconds - 1).clamp(0, _durationSeconds);
-    }
-
-    final playUrl = _getEmbedUrl(
-      widget.reel.bunnyUrl,
-      autoplay: true,
-      startSeconds: start,
-    );
-    _webController!.runJavaScript('''
-      var iframe = document.getElementById('bunny-player');
-      if (iframe) { iframe.src = "$playUrl"; }
-    ''');
-    _webIsShowingPausedFrame = false;
-  }
-
-  void _pauseVideoWeb() {
-    if (_webController == null) return;
-
-    var start = _progressSecondsNotifier.value < 0 ? 0 : _progressSecondsNotifier.value;
-    if (_durationSeconds > 0 && start >= _durationSeconds) {
-      start = (_durationSeconds - 1).clamp(0, _durationSeconds);
-    }
-
-    final pausedUrl = _getEmbedUrl(
-      widget.reel.bunnyUrl,
-      autoplay: false,
-      startSeconds: start,
-    );
-
-    _webController!.runJavaScript('''
-      var iframe = document.getElementById('bunny-player');
-      if (iframe) { iframe.src = "$pausedUrl"; }
-    ''');
-    _webIsShowingPausedFrame = true;
-  }
-
   Future<void> _preloadNext() async {
     final nextUrl = widget.nextBunnyUrl;
     if (nextUrl == null || nextUrl.isEmpty) return;
@@ -503,7 +309,7 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
     await reelControllerPool.setDataSource(
       nextController,
       url: nextUrl,
-      tryHlsFirst: true,
+      forceStart: false,
     );
     await reelControllerPool.warmUp(nextController);
   }
@@ -536,9 +342,6 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
         debugPrint('ReelPlayerWidget: play skipped after dispose: $e');
       }
       _startViewTimer();
-    } else if (_webController != null) {
-      _playVideoWeb();
-      _startViewTimer();
     }
     _startOrStopProgressTimer();
   }
@@ -548,8 +351,6 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
       try {
         _controller!.pause();
       } catch (_) {}
-    } else if (_webController != null) {
-      _pauseVideoWeb();
     }
     _progressTimer?.cancel();
   }
@@ -619,18 +420,6 @@ class _ReelPlayerWidgetState extends State<ReelPlayerWidget>
 
     if (_controller != null) {
       _seekAndResume(targetSeconds);
-    } else if (_webController != null) {
-      final startSeconds = targetSeconds;
-      final playUrl = _getEmbedUrl(
-        widget.reel.bunnyUrl,
-        autoplay: _shouldPlayNow,
-        startSeconds: startSeconds,
-      );
-      _webController!.runJavaScript('''
-        var iframe = document.getElementById('bunny-player');
-        if (iframe) { iframe.src = "$playUrl"; }
-      ''');
-      _webIsShowingPausedFrame = !_shouldPlayNow;
     }
   }
 

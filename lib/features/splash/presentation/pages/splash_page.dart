@@ -152,8 +152,8 @@ class _SplashPageState extends State<SplashPage>
             text: const TextSpan(
                       children: [
                         TextSpan(
-                          text: 'مستقبل ابنك يبدأ\n',
-                          // text: 'TESTTTTTTTTTTTTTTT',
+                          // text: 'مستقبل ابنك يبدأ\n',
+                          text: 'TESTTTTTTTTTTTTTTT',
                           style: TextStyle(
                             fontFamily: 'Cairo',
                             fontSize: 30,

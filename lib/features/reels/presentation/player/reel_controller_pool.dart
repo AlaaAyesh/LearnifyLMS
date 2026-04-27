@@ -41,7 +41,7 @@ class ReelControllerPool {
   BetterPlayerController _createController() {
     return BetterPlayerController(
       BetterPlayerConfiguration(
-        autoPlay: true,
+        autoPlay: false,
         autoDispose: false,
         looping: true,
         handleLifecycle: true,
@@ -64,6 +64,18 @@ class ReelControllerPool {
     );
   }
 
+  void releaseSlot(int slot) {
+    if (slot < 0 || slot >= _controllers.length) return;
+    try {
+      _controllers[slot].pause();
+    } catch (_) {}
+  }
+
+  bool contains(BetterPlayerController controller) {
+    return _controllers.contains(controller);
+  }
+
+  /// Bunny Stream `/play/{id}` → `{base}/{id}/playlist.m3u8` for HLS.
   static String toBunnyHlsUrl(String bunnyPlayUrl) {
     final url = bunnyPlayUrl.trim();
     if (url.isEmpty) return url;
@@ -77,29 +89,21 @@ class ReelControllerPool {
     return '$base/$pathPart/playlist.m3u8';
   }
 
-  void releaseSlot(int slot) {
-    if (slot < 0 || slot >= _controllers.length) return;
-    try {
-      _controllers[slot].pause();
-    } catch (_) {}
+  static bool _isIosLikeReelsTarget() {
+    if (kIsWeb) return false;
+    return defaultTargetPlatform == TargetPlatform.iOS;
   }
 
-  bool contains(BetterPlayerController controller) {
-    return _controllers.contains(controller);
-  }
-
-  static Future<void> _applyIosReelAutoplayMute(BetterPlayerController controller) async {
-    if (kIsWeb) return;
-    if (defaultTargetPlatform != TargetPlatform.iOS) return;
-    try {
-      await controller.setVolume(0);
-    } catch (_) {}
-  }
-
+  /// Hybrid reels loading (no WebView): **iOS** prefers progressive (`other`);
+  /// **Android** (and other non‑iOS) prefers **HLS** from [toBunnyHlsUrl].
+  /// Falls back to the alternate strategy if the primary load fails.
+  ///
+  /// [forceStart]: when true, mutes on iOS then calls [play]. When false (preload),
+  /// only binds the source; use [warmUp] to buffer.
   Future<bool> setDataSource(
     BetterPlayerController controller, {
     required String url,
-    bool tryHlsFirst = true,
+    bool forceStart = true,
   }) async {
     if (url.trim().isEmpty) return false;
 
@@ -108,7 +112,6 @@ class ReelControllerPool {
     } catch (_) {}
 
     final trimmed = url.trim();
-    final hlsUrl = toBunnyHlsUrl(trimmed);
 
     Future<void> tryLoad(String loadUrl, BetterPlayerVideoFormat format) async {
       final dataSource = BetterPlayerDataSource(
@@ -121,50 +124,55 @@ class ReelControllerPool {
       await controller.setupDataSource(dataSource);
     }
 
-    if (tryHlsFirst) {
-      try {
+    Future<bool> bindPrimary() async {
+      if (_isIosLikeReelsTarget()) {
+        await tryLoad(trimmed, BetterPlayerVideoFormat.other);
+      } else {
+        final hlsUrl = toBunnyHlsUrl(trimmed);
         await tryLoad(hlsUrl, BetterPlayerVideoFormat.hls);
-        await _applyIosReelAutoplayMute(controller);
-        return true;
-      } catch (e) {
-        debugPrint('Reel HLS failed: $e');
       }
+      return true;
     }
 
-    if (hlsUrl != trimmed) {
-      try {
+    Future<bool> bindFallback() async {
+      if (_isIosLikeReelsTarget()) {
+        final hlsUrl = toBunnyHlsUrl(trimmed);
+        await tryLoad(hlsUrl, BetterPlayerVideoFormat.hls);
+      } else {
         await tryLoad(trimmed, BetterPlayerVideoFormat.other);
-        await _applyIosReelAutoplayMute(controller);
-        return true;
-      } catch (e) {
-        debugPrint('Reel original URL (progressive) failed: $e');
       }
+      return true;
     }
 
-    if (hlsUrl == trimmed) {
-      try {
-        await tryLoad(trimmed, BetterPlayerVideoFormat.other);
-        await _applyIosReelAutoplayMute(controller);
-        return true;
-      } catch (e) {
-        debugPrint('Reel same-URL other format failed: $e');
+    Future<void> maybeForceStart() async {
+      if (!forceStart) return;
+      if (_isIosLikeReelsTarget()) {
+        try {
+          await controller.setVolume(0);
+        } catch (_) {}
       }
-    } else {
       try {
-        await tryLoad(hlsUrl, BetterPlayerVideoFormat.other);
-        await _applyIosReelAutoplayMute(controller);
-        return true;
-      } catch (e) {
-        debugPrint('Reel HLS URL as progressive failed: $e');
-      }
+        await controller.play();
+      } catch (_) {}
+    }
+
+    try {
+      await bindPrimary();
+      await maybeForceStart();
+      return true;
+    } catch (e) {
+      debugPrint('Reel primary load failed: $e');
+    }
+
+    try {
+      await bindFallback();
+      await maybeForceStart();
+      return true;
+    } catch (e) {
+      debugPrint('Reel fallback load failed: $e');
     }
 
     return false;
-  }
-
-  static bool isDirectStreamUrl(String url) {
-    final u = url.trim().toLowerCase();
-    return u.contains('.m3u8') || u.contains('.mp4');
   }
 
   Future<void> warmUp(BetterPlayerController controller) async {
@@ -189,9 +197,6 @@ class ReelControllerPool {
     final toDispose = List<BetterPlayerController>.from(_controllers);
     _controllers.clear();
 
-    // Disposing BetterPlayerController triggers VideoPlayerController notifications.
-    // On iOS this can cause "widget tree locked" assertions if done during finalizeTree.
-    // Dispose after the current frame to avoid tearing down while the framework is locked.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       for (final c in toDispose) {
         try {
@@ -207,4 +212,3 @@ class ReelControllerPool {
 }
 
 final reelControllerPool = ReelControllerPool();
-
